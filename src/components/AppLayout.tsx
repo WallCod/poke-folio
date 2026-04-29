@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { Logo } from "./Logo";
-import { LayoutDashboard, Library, BookOpen, Tag, User } from "lucide-react";
+import { LayoutDashboard, Library, BookOpen, Tag, User, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/store/useCollection";
 
@@ -9,6 +9,7 @@ const nav = [
   { to: "/collection", label: "Coleção", icon: Library },
   { to: "/catalog", label: "Catálogo", icon: BookOpen },
   { to: "/prices", label: "Preços", icon: Tag },
+  { to: "/pricing", label: "Planos", icon: Crown },
   { to: "/profile", label: "Perfil", icon: User },
 ];
 
@@ -81,7 +82,7 @@ export const AppLayout = () => {
 
       {/* Bottom nav — mobile */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 backdrop-blur-xl bg-background/85 border-t border-border/60">
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           {nav.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}

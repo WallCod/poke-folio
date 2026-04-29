@@ -53,7 +53,7 @@ const Landing = () => {
       </header>
 
       {/* Hero */}
-      <section className="container flex-1 flex items-center py-12 md:py-20">
+      <section className="container flex-1 flex items-center py-20 md:py-32">
         <div className="max-w-3xl mx-auto text-center space-y-8 animate-fade-in">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full surface-elevated border border-border/70 text-xs text-muted-foreground">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
@@ -89,8 +89,17 @@ const Landing = () => {
             </Button>
           </div>
 
+          <div className="pt-2">
+            <Link
+              to="/pricing"
+              className="text-sm text-muted-foreground hover:text-primary transition-colors inline-flex items-center gap-1"
+            >
+              Ver planos e preços <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
           {/* Feature pills */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-12 max-w-2xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-16 max-w-3xl mx-auto">
             {[
               {
                 icon: Sparkles,
@@ -110,15 +119,13 @@ const Landing = () => {
             ].map(({ icon: Icon, title, desc }) => (
               <div
                 key={title}
-                className="glass-panel p-4 text-left flex items-start gap-3"
+                className="glass-panel h-36 p-6 flex flex-col items-center justify-center text-center gap-2"
               >
-                <div className="h-9 w-9 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center text-primary shrink-0">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center text-primary shrink-0">
                   <Icon className="h-4 w-4" />
                 </div>
-                <div>
-                  <p className="font-display font-semibold text-sm">{title}</p>
-                  <p className="text-xs text-muted-foreground">{desc}</p>
-                </div>
+                <p className="font-display font-semibold text-sm whitespace-nowrap">{title}</p>
+                <p className="text-xs text-muted-foreground whitespace-nowrap">{desc}</p>
               </div>
             ))}
           </div>
