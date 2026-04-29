@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { Logo } from "./Logo";
-import { LayoutDashboard, Library, BookOpen, Tag, User } from "lucide-react";
+import { LayoutDashboard, Library, BookOpen, Tag, User, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/store/useCollection";
 
@@ -9,6 +9,7 @@ const nav = [
   { to: "/collection", label: "Coleção", icon: Library },
   { to: "/catalog", label: "Catálogo", icon: BookOpen },
   { to: "/prices", label: "Preços", icon: Tag },
+  { to: "/pricing", label: "Planos", icon: Crown },
   { to: "/profile", label: "Perfil", icon: User },
 ];
 
