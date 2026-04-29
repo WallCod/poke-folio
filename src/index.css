@@ -1,96 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Pokéfolio — premium dark TCG aesthetic.
+   All colors HSL. */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Default to dark theme tokens (app is dark-first) */
+    --background: 240 22% 6%;            /* #0D0D14 */
+    --foreground: 240 17% 96%;           /* #F1F1F6 */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 240 17% 11%;                 /* #16161F */
+    --card-foreground: 240 17% 96%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --surface-elevated: 240 17% 15%;     /* #1E1E2C */
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --popover: 240 17% 11%;
+    --popover-foreground: 240 17% 96%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --primary: 48 100% 50%;              /* #FFCC00 Pokémon yellow */
+    --primary-foreground: 240 22% 6%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --secondary: 211 73% 59%;            /* #4A90E2 electric blue */
+    --secondary-foreground: 240 17% 96%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --muted: 240 17% 15%;
+    --muted-foreground: 240 11% 58%;     /* #8B8B9E */
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --accent: 48 100% 50%;
+    --accent-foreground: 240 22% 6%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 240 17% 96%;
 
-    --radius: 0.5rem;
+    --border: 240 10% 20%;               /* subtle */
+    --input: 240 17% 15%;
+    --ring: 48 100% 50%;
 
-    --sidebar-background: 0 0% 98%;
+    --radius: 0.875rem;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Rarity tokens */
+    --rarity-common: 240 6% 55%;
+    --rarity-uncommon: 142 71% 45%;
+    --rarity-rare: 211 90% 60%;
+    --rarity-holo: 271 91% 73%;          /* purple */
+    --rarity-ultra: 48 100% 50%;         /* gold */
+    --rarity-secret-from: 320 90% 65%;
+    --rarity-secret-via: 200 95% 60%;
+    --rarity-secret-to: 142 71% 50%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Gradients */
+    --gradient-holo: linear-gradient(120deg, hsl(271 91% 73% / 0.9), hsl(217 91% 70% / 0.9), hsl(151 65% 53% / 0.9));
+    --gradient-gold: linear-gradient(135deg, hsl(48 100% 60%), hsl(38 100% 50%));
+    --gradient-rare-border: linear-gradient(120deg, #C084FC, #60A5FA, #34D399);
+    --gradient-radial-glow: radial-gradient(circle at center, hsl(48 100% 50% / 0.18), transparent 65%);
 
-    --sidebar-primary-foreground: 0 0% 98%;
+    /* Shadows */
+    --shadow-card: 0 10px 30px -12px hsl(240 50% 2% / 0.7);
+    --shadow-glow-gold: 0 0 0 1px hsl(48 100% 50% / 0.4), 0 8px 30px -8px hsl(48 100% 50% / 0.4);
+    --shadow-elevated: 0 20px 50px -20px hsl(240 80% 2% / 0.8);
 
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Sidebar (kept for compat) */
+    --sidebar-background: 240 17% 9%;
+    --sidebar-foreground: 240 17% 96%;
+    --sidebar-primary: 48 100% 50%;
+    --sidebar-primary-foreground: 240 22% 6%;
+    --sidebar-accent: 240 17% 15%;
+    --sidebar-accent-foreground: 240 17% 96%;
+    --sidebar-border: 240 10% 18%;
+    --sidebar-ring: 48 100% 50%;
   }
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+  /* Light mode (basic — app is dark-first per spec) */
+  .light {
+    --background: 0 0% 98%;
+    --foreground: 240 22% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 22% 10%;
+    --surface-elevated: 0 0% 96%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 22% 10%;
+    --primary: 45 100% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 211 73% 50%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 240 10% 94%;
+    --muted-foreground: 240 6% 40%;
+    --accent: 45 100% 45%;
+    --accent-foreground: 0 0% 100%;
+    --border: 240 10% 88%;
+    --input: 240 10% 92%;
+    --ring: 45 100% 45%;
   }
 }
 
@@ -99,7 +102,146 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground;
+  html {
+    /* dark-first: ensure scrollbar styles match */
+    color-scheme: dark;
   }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -10%, hsl(48 100% 50% / 0.06), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 100%, hsl(211 73% 59% / 0.05), transparent);
+    background-attachment: fixed;
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-card/60 backdrop-blur-xl border border-border/60 rounded-2xl;
+    box-shadow: var(--shadow-card);
+  }
+
+  .surface-elevated {
+    background-color: hsl(var(--surface-elevated));
+  }
+
+  .text-gradient-gold {
+    background: var(--gradient-gold);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .text-gradient-holo {
+    background: linear-gradient(120deg, #C084FC, #60A5FA, #34D399);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Holographic card hover effect — uses CSS vars set by JS for mouse position */
+  .holo-card {
+    position: relative;
+    isolation: isolate;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+  .holo-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      circle at var(--mx, 50%) var(--my, 50%),
+      hsl(48 100% 70% / 0.35),
+      transparent 40%
+    );
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .holo-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+      115deg,
+      transparent 30%,
+      hsl(271 91% 73% / 0.18) 45%,
+      hsl(211 91% 70% / 0.18) 55%,
+      hsl(151 65% 53% / 0.18) 65%,
+      transparent 80%
+    );
+    background-size: 200% 200%;
+    background-position: calc(var(--mx, 50%) * -0.5) calc(var(--my, 50%) * -0.5);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    mix-blend-mode: color-dodge;
+    pointer-events: none;
+    z-index: 3;
+  }
+  .holo-card:hover {
+    transform: translateY(-4px);
+  }
+  .holo-card:hover::before,
+  .holo-card:hover::after {
+    opacity: 1;
+  }
+
+  /* Gold glow border for ultra/secret rare */
+  .border-gold-glow {
+    box-shadow:
+      0 0 0 1px hsl(48 100% 50% / 0.6),
+      0 0 25px -5px hsl(48 100% 50% / 0.55);
+  }
+  .border-holo-glow {
+    position: relative;
+  }
+  .border-holo-glow::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: var(--gradient-rare-border);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .nav-active {
+    position: relative;
+  }
+  .nav-active::after {
+    content: '';
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    bottom: -6px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--gradient-gold);
+    box-shadow: 0 0 10px hsl(48 100% 50% / 0.7);
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
 }
