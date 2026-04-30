@@ -9,9 +9,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Calendar, Library, Heart, LogOut, Moon, Sun } from "lucide-react";
+import { Calendar, Library, Heart, LogOut, Moon, Sun, Shield, ArrowRight } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { getSession, clearSession } from "@/lib/auth";
+import { toast } from "sonner";
 
 const Profile = () => {
   const user = useUser();
@@ -22,6 +24,8 @@ const Profile = () => {
   const totalCards = cards.reduce((sum, c) => sum + c.quantity, 0);
   const navigate = useNavigate();
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const session = getSession();
+  const isAdmin = session?.role === "admin";
 
   useEffect(() => {
     document.documentElement.classList.toggle("light", theme === "light");
