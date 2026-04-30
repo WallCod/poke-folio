@@ -73,6 +73,29 @@ const Profile = () => {
         </div>
       </div>
 
+      {/* Admin area card — only for admins */}
+      {isAdmin && (
+        <div className="glass-panel p-6 border border-[hsl(28_85%_44%)]/40 bg-[hsl(28_85%_44%)]/5 space-y-4">
+          <div className="flex items-start gap-4">
+            <div className="h-11 w-11 rounded-xl bg-[hsl(28_85%_44%)]/15 border border-[hsl(28_85%_44%)]/40 flex items-center justify-center text-[hsl(28_85%_60%)] shrink-0">
+              <Shield className="h-5 w-5" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-display text-lg font-bold">Área Administrativa</h3>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Você tem permissões de administrador. Acesse o painel para gerenciar usuários, planos e configurações.
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={() => navigate("/admin/dashboard")}
+            className="w-full bg-[hsl(28_85%_44%)] hover:bg-[hsl(28_85%_38%)] text-white font-semibold"
+          >
+            Acessar painel admin <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
       {/* Settings */}
       <div className="glass-panel p-6 space-y-5">
         <h3 className="font-display text-lg font-bold">Configurações</h3>
@@ -117,7 +140,11 @@ const Profile = () => {
         </div>
 
         <Button
-          onClick={() => navigate("/")}
+          onClick={() => {
+            clearSession();
+            toast.success("Sessão encerrada");
+            navigate("/");
+          }}
           variant="outline"
           className="w-full border-destructive/40 text-destructive hover:bg-destructive/10"
         >
