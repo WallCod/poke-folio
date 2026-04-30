@@ -1,8 +1,20 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, CreditCard, Settings, LogOut } from "lucide-react";
-import { AdminLogo } from "./AdminLogo";
+import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
+import { LayoutDashboard, Users, CreditCard, Settings, LogOut, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { clearSession } from "@/lib/auth";
+
+const AdminLogo = () => (
+  <Link to="/admin/dashboard" className="flex items-center gap-2.5 group">
+    <div className="h-8 w-8 rounded-lg bg-[hsl(28_85%_44%)]/15 border border-[hsl(28_85%_44%)]/40 flex items-center justify-center text-[hsl(28_85%_60%)]">
+      <Shield className="h-4 w-4" />
+    </div>
+    <div className="leading-tight">
+      <p className="font-display font-bold text-sm">Pokéfolio</p>
+      <p className="text-[10px] uppercase tracking-[0.18em] text-[hsl(28_85%_60%)]">Admin</p>
+    </div>
+  </Link>
+);
 
 const items = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -14,8 +26,10 @@ const items = [
 export const AdminLayout = () => {
   const navigate = useNavigate();
   const handleLogout = () => {
+    clearSession();
+    // also clear legacy
     localStorage.removeItem("adminToken");
-    navigate("/admin/login");
+    navigate("/login");
   };
 
   return (
