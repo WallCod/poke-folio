@@ -22,9 +22,7 @@ export const AppLayout = () => {
       {/* Top navbar — desktop */}
       <header className="hidden md:block sticky top-0 z-40 backdrop-blur-xl bg-background/70 border-b border-border/60">
         <div className="container flex h-16 items-center justify-between gap-6">
-          <button onClick={() => navigate("/dashboard")} className="shrink-0">
-            <Logo />
-          </button>
+          <Logo />
 
           <nav className="flex items-center gap-1">
             {nav.map(({ to, label, icon: Icon }) => (
@@ -35,7 +33,7 @@ export const AppLayout = () => {
                   cn(
                     "relative px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors",
                     isActive
-                      ? "text-foreground nav-active"
+                      ? "text-primary nav-active"
                       : "text-muted-foreground hover:text-foreground hover:bg-surface-elevated"
                   )
                 }
@@ -64,9 +62,7 @@ export const AppLayout = () => {
       {/* Mobile top bar */}
       <header className="md:hidden sticky top-0 z-40 backdrop-blur-xl bg-background/80 border-b border-border/60">
         <div className="container flex h-14 items-center justify-between">
-          <button onClick={() => navigate("/dashboard")}>
-            <Logo />
-          </button>
+          <Logo />
           <button
             onClick={() => navigate("/profile")}
             className="h-9 w-9 rounded-full bg-gradient-gold text-background font-display font-bold text-sm flex items-center justify-center"
