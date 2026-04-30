@@ -15,8 +15,24 @@ import {
 import { useCollection } from "@/store/useCollection";
 import { sampleOwned } from "@/data/sample";
 import { formatCurrency } from "@/lib/format";
-import { Search, Plus, Grid3x3, List } from "lucide-react";
+import { Search, Plus, Grid3x3, List, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Link } from "react-router-dom";
+
+const PokeballEmpty = ({ withQuestion = false }: { withQuestion?: boolean }) => (
+  <div className="relative h-28 w-28 mx-auto opacity-80">
+    <svg viewBox="0 0 100 100" className="h-full w-full">
+      <circle cx="50" cy="50" r="46" fill="hsl(240 17% 15%)" stroke="hsl(240 10% 30%)" strokeWidth="3" />
+      <path d="M 4,50 A 46,46 0 0 1 96,50 Z" fill="hsl(240 10% 24%)" />
+      <rect x="4" y="48" width="92" height="4" fill="hsl(240 22% 6%)" />
+      <circle cx="50" cy="50" r="11" fill="hsl(240 17% 11%)" stroke="hsl(240 10% 35%)" strokeWidth="2.5" />
+      <circle cx="50" cy="50" r="5" fill="hsl(240 10% 28%)" />
+      {withQuestion && (
+        <text x="50" y="56" textAnchor="middle" fontSize="11" fontFamily="Space Grotesk, sans-serif" fontWeight="700" fill="hsl(240 11% 58%)">?</text>
+      )}
+    </svg>
+  </div>
+);
 
 const Collection = () => {
   const userCards = useCollection((s) => s.cards);
