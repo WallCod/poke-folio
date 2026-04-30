@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
 import { BackToTop } from "@/components/BackToTop";
 import Landing from "./pages/Landing.tsx";
+import Login from "./pages/Login.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import Collection from "./pages/Collection.tsx";
 import Catalog from "./pages/Catalog.tsx";
@@ -14,10 +15,8 @@ import Profile from "./pages/Profile.tsx";
 import Pricing from "./pages/Pricing.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
-import { AdminGuard } from "./admin/AdminGuard";
+import { AdminRoute } from "./admin/AdminRoute";
 import { AdminLayout } from "./admin/AdminLayout";
-import AdminLogin from "./admin/pages/AdminLogin";
-import AdminForgotPassword from "./admin/pages/AdminForgotPassword";
 import AdminDashboard from "./admin/pages/AdminDashboard";
 import AdminUsers from "./admin/pages/AdminUsers";
 import AdminPlans from "./admin/pages/AdminPlans";
@@ -35,10 +34,11 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
-      <Sonner />
+      <Sonner position="bottom-left" />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/collection" element={<Collection />} />
@@ -48,10 +48,8 @@ const App = () => (
             <Route path="/profile" element={<Profile />} />
           </Route>
 
-          {/* Admin area — fully separate */}
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin/forgot-password" element={<AdminForgotPassword />} />
-          <Route element={<AdminGuard />}>
+          {/* Admin area — protected via AdminRoute (reads unified session) */}
+          <Route element={<AdminRoute />}>
             <Route element={<AdminLayout />}>
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/users" element={<AdminUsers />} />

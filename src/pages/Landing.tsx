@@ -13,9 +13,25 @@ import {
 } from "@/components/ui/dialog";
 import { Sparkles, Shield, TrendingUp, ArrowRight } from "lucide-react";
 import heroImage from "@/assets/hero-cards.jpg";
+import { mockLogin } from "@/lib/auth";
+import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 const Landing = () => {
   const [open, setOpen] = useState<"login" | "signup" | null>(null);
+  const [email, setEmail] = useState("");
+  const navigate = useNavigate();
+
+  const handleAuth = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      toast.error("Informe um email para continuar");
+      return;
+    }
+    const session = mockLogin(email);
+    toast.success(`Bem-vindo, ${session.name}!`);
+    navigate(session.role === "admin" ? "/admin/dashboard" : "/dashboard");
+  };
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden">
@@ -152,13 +168,7 @@ const Landing = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <form
-            className="space-y-4 pt-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              window.location.href = "/dashboard";
-            }}
-          >
+          <form className="space-y-4 pt-2" onSubmit={handleAuth}>
             {open === "signup" && (
               <div className="space-y-2">
                 <Label htmlFor="name">Nome</Label>
@@ -174,6 +184,8 @@ const Landing = () => {
               <Input
                 id="email"
                 type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="treinador@email.com"
                 className="surface-elevated border-border/70"
               />

@@ -72,18 +72,36 @@ const Catalog = () => {
       </div>
 
       {/* Results grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-        {loading
-          ? Array.from({ length: 12 }).map((_, i) => <CardSkeleton key={i} />)
-          : results.map((c) => (
-              <PokeCard
-                key={c.id}
-                card={c}
-                currency={currency}
-                onClick={() => setSelected(c)}
-              />
-            ))}
-      </div>
+      {!loading && results.length === 0 ? (
+        <div className="glass-panel p-12 text-center space-y-4">
+          <div className="relative h-28 w-28 mx-auto opacity-80">
+            <svg viewBox="0 0 100 100" className="h-full w-full">
+              <circle cx="50" cy="50" r="46" fill="hsl(240 17% 15%)" stroke="hsl(240 10% 30%)" strokeWidth="3" />
+              <path d="M 4,50 A 46,46 0 0 1 96,50 Z" fill="hsl(240 10% 24%)" />
+              <rect x="4" y="48" width="92" height="4" fill="hsl(240 22% 6%)" />
+              <circle cx="50" cy="50" r="11" fill="hsl(240 17% 11%)" stroke="hsl(240 10% 35%)" strokeWidth="2.5" />
+              <text x="50" y="56" textAnchor="middle" fontSize="11" fontFamily="Space Grotesk, sans-serif" fontWeight="700" fill="hsl(240 11% 58%)">?</text>
+            </svg>
+          </div>
+          <div>
+            <p className="font-display text-lg font-bold">Nenhuma carta encontrada</p>
+            <p className="text-sm text-muted-foreground mt-1">Tente outro nome ou filtro</p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          {loading
+            ? Array.from({ length: 12 }).map((_, i) => <CardSkeleton key={i} />)
+            : results.map((c) => (
+                <PokeCard
+                  key={c.id}
+                  card={c}
+                  currency={currency}
+                  onClick={() => setSelected(c)}
+                />
+              ))}
+        </div>
+      )}
 
       {/* Detail modal */}
       <Dialog open={!!selected} onOpenChange={(v) => !v && setSelected(null)}>
