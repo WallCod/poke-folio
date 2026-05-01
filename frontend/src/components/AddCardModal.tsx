@@ -20,6 +20,11 @@ import { Switch } from "@/components/ui/switch";
 import { Search, Plus, Minus } from "lucide-react";
 import { useCollection, type Condition } from "@/store/useCollection";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
+import { getSession } from "@/lib/auth";
+import { getUsers, getSettings } from "@/lib/storage";
+
+const FREE_CARD_LIMIT = 100;
 
 interface Props {
   open: boolean;
@@ -32,11 +37,26 @@ export const AddCardModal = ({ open, onOpenChange }: Props) => {
   const [condition, setCondition] = useState<Condition>("NM");
   const [foil, setFoil] = useState(false);
   const addCard = useCollection((s) => s.addCard);
+  const cards = useCollection((s) => s.cards);
+  const navigate = useNavigate();
+
+  const session = getSession();
+  const storedUser = session ? getUsers().find((u) => u.email === session.email) : null;
+  const settings = getSettings();
+  const planLimit = storedUser ? settings.planLimits[storedUser.plan].cardLimit : FREE_CARD_LIMIT;
+  const currentCount = cards.reduce((s, c) => s + c.quantity, 0);
+  const isAtLimit = planLimit !== -1 && currentCount >= planLimit;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!search.trim()) {
       toast.error("Digite o nome de uma carta");
+      return;
+    }
+    if (isAtLimit) {
+      toast.error("Limite de cartas atingido — faça upgrade do seu plano", {
+        action: { label: "Ver planos", onClick: () => { onOpenChange(false); navigate("/pricing"); } },
+      });
       return;
     }
     addCard({
@@ -144,9 +164,22 @@ export const AddCardModal = ({ open, onOpenChange }: Props) => {
             <Switch id="foil" checked={foil} onCheckedChange={setFoil} />
           </div>
 
+          {isAtLimit && (
+            <div className="rounded-lg bg-red-950/60 border border-red-500/40 px-3 py-2 text-xs text-red-300">
+              Limite de {planLimit} cartas atingido.{" "}
+              <button
+                type="button"
+                className="underline hover:text-white"
+                onClick={() => { onOpenChange(false); navigate("/pricing"); }}
+              >
+                Faça upgrade do seu plano
+              </button>
+            </div>
+          )}
           <Button
             type="submit"
-            className="w-full bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold transition-all"
+            disabled={isAtLimit}
+            className="w-full bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold transition-all disabled:opacity-50"
           >
             Confirmar
           </Button>

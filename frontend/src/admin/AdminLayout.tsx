@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
-import { LayoutDashboard, Users, CreditCard, Settings, LogOut, Shield } from "lucide-react";
+import { LayoutDashboard, Users, CreditCard, Settings, LogOut, Shield, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { clearSession } from "@/lib/auth";
@@ -20,6 +20,7 @@ const items = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/users", label: "Usuários", icon: Users },
   { to: "/admin/plans", label: "Planos", icon: CreditCard },
+  { to: "/admin/payments", label: "Pagamentos", icon: Receipt },
   { to: "/admin/settings", label: "Configurações", icon: Settings },
 ];
 

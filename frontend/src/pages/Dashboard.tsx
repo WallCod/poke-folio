@@ -5,6 +5,8 @@ import { CardSkeleton } from "@/components/Skeletons";
 import { sampleOwned, valueHistory } from "@/data/sample";
 import { useCollection } from "@/store/useCollection";
 import { formatCurrency } from "@/lib/format";
+import { getSession } from "@/lib/auth";
+import { getUsers } from "@/lib/storage";
 import {
   Library,
   Wallet,
@@ -31,6 +33,10 @@ const Dashboard = () => {
   const cards = userCards.length > 0 ? userCards : sampleOwned;
   const isEmpty = userCards.length === 0;
 
+  const session = getSession();
+  const storedUser = session ? getUsers().find((u) => u.email === session.email) : null;
+  const isOverdue = storedUser?.planStatus === "overdue" || storedUser?.planStatus === "suspended";
+
   const totalCards = cards.reduce((sum, c) => sum + c.quantity, 0);
   const totalValue = cards.reduce(
     (sum, c) => sum + c.marketPrice * c.quantity,
@@ -46,6 +52,20 @@ const Dashboard = () => {
 
   return (
     <div className="container pt-8 space-y-10 animate-fade-in">
+      {/* Banner de plano vencido/suspenso */}
+      {isOverdue && (
+        <div className="flex items-center justify-between gap-4 rounded-xl bg-red-950/80 border border-red-500/40 px-4 py-3">
+          <p className="text-sm text-red-200">
+            Sua assinatura está com pagamento pendente. Regularize para continuar usando todos os recursos.
+          </p>
+          <Link
+            to="/pricing"
+            className="shrink-0 text-xs font-semibold text-red-200 underline hover:text-white transition-colors"
+          >
+            Ver planos
+          </Link>
+        </div>
+      )}
       {/* Greeting */}
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>

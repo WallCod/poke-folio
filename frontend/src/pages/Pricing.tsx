@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Check, Sparkles, Crown, Zap, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getSession } from "@/lib/auth";
+import { getUsers } from "@/lib/storage";
 
 type Billing = "monthly" | "annual";
 
@@ -75,9 +77,16 @@ const formatPrice = (monthly: number, billing: Billing) => {
   }).format(value);
 };
 
+// Map pricing page plan IDs to storage plan IDs
+const PLAN_ID_MAP: Record<string, string> = { free: "free", trainer: "treinador", master: "mestre" };
+
 const Pricing = () => {
   const [billing, setBilling] = useState<Billing>("monthly");
   const navigate = useNavigate();
+
+  const session = getSession();
+  const storedUser = session ? getUsers().find((u) => u.email === session.email) : null;
+  const currentPlanId = storedUser?.plan ?? null;
 
   return (
     <div className="container pt-12 pb-16 animate-fade-in">
@@ -139,6 +148,7 @@ const Pricing = () => {
         {plans.map((plan) => {
           const Icon = plan.icon;
           const price = formatPrice(plan.monthly, billing);
+          const isCurrentPlan = currentPlanId !== null && PLAN_ID_MAP[plan.id] === currentPlanId;
           return (
             <div
               key={plan.id}
@@ -152,6 +162,20 @@ const Pricing = () => {
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <span className="bg-gradient-gold text-background text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full shadow-glow-gold">
                     ★ Mais popular
+                  </span>
+                </div>
+              )}
+              {isCurrentPlan && !plan.highlight && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <span className="bg-emerald-500 text-white text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">
+                    ✓ Seu plano atual
+                  </span>
+                </div>
+              )}
+              {isCurrentPlan && plan.highlight && (
+                <div className="absolute -top-3 right-4">
+                  <span className="bg-emerald-500 text-white text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">
+                    ✓ Seu plano atual
                   </span>
                 </div>
               )}
