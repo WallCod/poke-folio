@@ -476,7 +476,7 @@ const SetDetail = () => {
   const pct = cards.length > 0 ? Math.round((ownedCount / cards.length) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen flex flex-col">
       <PublicHeader />
 
       {/* Sub-header do set */}

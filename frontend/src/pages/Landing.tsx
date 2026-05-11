@@ -13,10 +13,9 @@ import {
   Zap, Crown, Loader2, Eye, EyeOff, CheckCircle2, Star, X,
 } from "lucide-react";
 import { EnergyIcon } from "@/components/EnergyIcon";
-import { mockLogin, setSessionFromApi, getSession, clearSession } from "@/lib/auth";
-import { authApi } from "@/lib/api";
-import api from "@/lib/api";
+import { getSession, clearSession } from "@/lib/auth";
 import { modal } from "@/store/useAppModal";
+import { useAuthModal } from "@/store/useAuthModal";
 import { cn } from "@/lib/utils";
 
 // ─── SVG Decorativos ─────────────────────────────────────────────────────────
@@ -342,33 +341,28 @@ const PLANS = [
   { id: "master",  name: "Mestre Pokémon", price: "R$ 34,90/mês",  icon: Crown,    features: ["Tudo do Treinador", "Alertas de valorização", "Suporte 24/7"],        cta: "Tornar-se Mestre", highlight: false },
 ];
 
-type ModalView = "login" | "signup" | "forgot" | "forgot-sent" | "reset" | null;
-
 // ─── Landing ──────────────────────────────────────────────────────────────────
 
 const Landing = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [session, setSession] = useState(getSession);
+  const { open: openAuth } = useAuthModal();
 
   const urlParams = new URLSearchParams(window.location.search);
   const urlResetToken = urlParams.get("reset");
 
-  const [open, setOpen] = useState<ModalView>(() => {
-    if (urlResetToken) return "reset";
-    const nav = location.state as { openModal?: string } | null;
-    if (nav?.openModal === "login") return "login";
-    if (nav?.openModal === "signup") return "signup";
-    return null;
+  // Abre modal de reset de senha via query param
+  useState(() => {
+    if (urlResetToken) {
+      window.history.replaceState({}, "", window.location.pathname);
+      useAuthModal.getState().open("reset");
+    } else {
+      const nav = location.state as { openModal?: string } | null;
+      if (nav?.openModal === "login") useAuthModal.getState().open("login");
+      else if (nav?.openModal === "signup") useAuthModal.getState().open("signup");
+    }
   });
-  const [resetToken, setResetToken] = useState(urlResetToken ?? "");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   // Dados públicos
   const [sets, setSets] = useState<TcgSet[]>([]);
@@ -382,8 +376,6 @@ const Landing = () => {
 
   const [topCards, setTopCards] = useState<TrendCard[]>([]);
   const [marketModal, setMarketModal] = useState<TrendCard | null>(null);
-
-  if (urlResetToken) window.history.replaceState({}, "", window.location.pathname);
 
   const baseUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3001/api").replace(/\/api$/, "");
 
@@ -409,57 +401,6 @@ const Landing = () => {
       .finally(() => setTrendLoading(false));
   }, [trendPeriod]);
 
-  const resetFields = () => {
-    setName(""); setEmail(""); setPassword(""); setNewPassword(""); setConfirmPassword(""); setResetToken(""); setShowPassword(false);
-  };
-  const openModal  = (v: ModalView) => { resetFields(); setOpen(v); };
-  const closeModal = () => { resetFields(); setOpen(null); };
-
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) { modal.error("Campos obrigatórios", "Preencha email e senha."); return; }
-    setLoading(true);
-    try {
-      if (open === "signup") {
-        if (!name.trim()) { modal.error("Nome obrigatório", "Informe seu nome."); setLoading(false); return; }
-        await authApi.register({ name, email, password });
-        closeModal(); navigate("/verify-email");
-      } else {
-        const { data } = await authApi.login({ email, password });
-        const s = setSessionFromApi(data); setSession(s); closeModal();
-        modal.success(`Bem-vindo de volta, ${s.name}!`);
-      }
-    } catch (err: unknown) {
-      const msg = (err as any)?.response?.data?.error ?? "Erro ao conectar com o servidor";
-      if (msg === "Erro ao conectar com o servidor" && import.meta.env.DEV) {
-        const s = mockLogin(email); setSession(s); closeModal();
-        modal.success(`[dev] ${s.name}`, "Backend offline — usando mock.");
-      } else { modal.error("Falha no acesso", msg); }
-    } finally { setLoading(false); }
-  };
-
-  const handleForgot = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) { modal.error("Campo obrigatório", "Informe seu email."); return; }
-    setLoading(true);
-    try { await api.post("/auth/forgot-password", { email }); setOpen("forgot-sent"); }
-    catch (err: unknown) { modal.error("Erro", (err as any)?.response?.data?.error ?? "Não foi possível enviar."); }
-    finally { setLoading(false); }
-  };
-
-  const handleReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPassword || !confirmPassword) { modal.error("Campos obrigatórios", "Preencha todos."); return; }
-    if (newPassword.length < 6) { modal.error("Senha fraca", "Mínimo 6 caracteres."); return; }
-    if (newPassword !== confirmPassword) { modal.error("Senhas diferentes", "As senhas não coincidem."); return; }
-    setLoading(true);
-    try {
-      await api.post("/auth/reset-password", { token: resetToken, password: newPassword });
-      setOpen("login"); resetFields(); modal.success("Senha redefinida!", "Faça login com a nova senha.");
-    } catch (err: unknown) { modal.error("Erro", (err as any)?.response?.data?.error ?? "Não foi possível redefinir."); }
-    finally { setLoading(false); }
-  };
-
   const allSeries = Array.from(new Set(sets.map((s) => s.series))).filter(Boolean);
   const filteredSets = setsFilter === "all" ? sets : sets.filter((s) => s.series === setsFilter);
   const visibleSets = filteredSets.slice(0, 24);
@@ -470,10 +411,7 @@ const Landing = () => {
   return (
     <div className="min-h-screen flex flex-col relative">
 
-      <PublicHeader
-        onLoginClick={() => setOpen("login")}
-        onSignupClick={() => setOpen("signup")}
-      />
+      <PublicHeader />
 
       {/* ── Hero com campo hexagonal ── */}
       <section className="container flex-1 flex items-start pt-10 md:pt-14 pb-8 relative">
@@ -508,10 +446,10 @@ const Landing = () => {
               </>
             ) : (
               <>
-                <Button size="lg" onClick={() => setOpen("signup")} className="bg-gradient-gold text-background font-semibold text-base px-7 hover:opacity-90 hover:shadow-glow-gold transition-all animate-pulse-gold">
+                <Button size="lg" onClick={() => openAuth("signup")} className="bg-gradient-gold text-background font-semibold text-base px-7 hover:opacity-90 hover:shadow-glow-gold transition-all animate-pulse-gold">
                   Criar minha coleção <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
-                <Button size="lg" variant="outline" onClick={() => setOpen("login")} className="border-border/70 bg-card/50 backdrop-blur hover:bg-surface-elevated text-base px-7">
+                <Button size="lg" variant="outline" onClick={() => openAuth("login")} className="border-border/70 bg-card/50 backdrop-blur hover:bg-surface-elevated text-base px-7">
                   Já tenho conta
                 </Button>
               </>
@@ -624,7 +562,7 @@ const Landing = () => {
           )}
 
           <div className="text-center mt-6">
-            <Button variant="outline" onClick={() => session ? navigate("/prices") : setOpen("signup")}
+            <Button variant="outline" onClick={() => session ? navigate("/prices") : openAuth("signup")}
               className="border-border/70 hover:border-primary/50 hover:bg-primary/5 text-sm">
               {session ? "Ver preços completos" : "Criar conta para acompanhar"}
               <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
@@ -663,7 +601,7 @@ const Landing = () => {
             </div>
 
             <div className="text-center mt-8">
-              <Button onClick={() => session ? navigate("/prices") : setOpen("signup")}
+              <Button onClick={() => session ? navigate("/prices") : openAuth("signup")}
                 className="bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold">
                 {session ? "Ver todos os preços" : "Criar conta para acompanhar"}
                 <ArrowRight className="h-4 w-4 ml-1.5" />
@@ -774,7 +712,7 @@ const Landing = () => {
                       </li>
                     ))}
                   </ul>
-                  <Button size="sm" onClick={() => session ? navigate("/dashboard") : setOpen("signup")}
+                  <Button size="sm" onClick={() => session ? navigate("/dashboard") : openAuth("signup")}
                     className={cn("w-full text-xs font-semibold",
                       plan.highlight ? "bg-gradient-gold text-background hover:opacity-90" : "bg-surface-elevated border border-border/60 text-foreground hover:bg-card")}>
                     {session ? "Ir para o portfolio" : plan.cta}
@@ -791,131 +729,6 @@ const Landing = () => {
       </section>
 
       <PublicFooter />
-
-      {/* ── Modal auth ── */}
-      <Dialog open={open !== null} onOpenChange={(v) => { if (!v) closeModal(); }}>
-        <DialogContent className="bg-card border-border/70 max-w-md">
-
-          {(open === "login" || open === "signup") && (
-            <>
-              <DialogHeader className="items-center text-center space-y-0 pb-0">
-                <GoldPokeball />
-                <DialogTitle className="font-display text-2xl text-center">
-                  {open === "signup" ? "Criar sua conta" : "Bem-vindo de volta"}
-                </DialogTitle>
-              </DialogHeader>
-              <form className="space-y-4 pt-4" onSubmit={handleAuth}>
-                {open === "signup" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nome</Label>
-                    <Input id="name" placeholder="Como devemos te chamar?" className="surface-elevated border-border/70" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="treinador@email.com" className="surface-elevated border-border/70" autoFocus={open === "login"} />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Senha</Label>
-                    {open === "login" && (
-                      <button type="button" onClick={() => { setPassword(""); setShowPassword(false); setOpen("forgot"); }} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                        Esqueceu a senha?
-                      </button>
-                    )}
-                  </div>
-                  <div className="relative">
-                    <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="surface-elevated border-border/70 pr-10" />
-                    <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" tabIndex={-1}>
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-                <Button type="submit" disabled={loading} className="w-full bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold disabled:opacity-60">
-                  {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Aguarde...</> : (open === "signup" ? "Criar conta" : "Entrar")}
-                </Button>
-                <p className="text-center text-xs text-muted-foreground pt-1">
-                  {open === "signup" ? "Já tem conta?" : "Novo por aqui?"}{" "}
-                  <button type="button" onClick={() => { setPassword(""); setShowPassword(false); setOpen(open === "signup" ? "login" : "signup"); }} className="text-primary hover:underline font-medium">
-                    {open === "signup" ? "Entrar" : "Criar conta"}
-                  </button>
-                </p>
-              </form>
-            </>
-          )}
-
-          {open === "forgot" && (
-            <>
-              <DialogHeader className="items-center text-center space-y-0 pb-0">
-                <GoldPokeball />
-                <DialogTitle className="font-display text-2xl text-center">Esqueceu a senha?</DialogTitle>
-              </DialogHeader>
-              <p className="text-center text-sm text-muted-foreground -mt-1">Informe seu email e enviaremos um link para redefinir sua senha.</p>
-              <form className="space-y-4" onSubmit={handleForgot}>
-                <div className="space-y-2">
-                  <Label htmlFor="forgot-email">Email</Label>
-                  <Input id="forgot-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="treinador@email.com" className="surface-elevated border-border/70" autoFocus />
-                </div>
-                <Button type="submit" disabled={loading} className="w-full bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold disabled:opacity-60">
-                  {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Enviando...</> : "Enviar link de redefinição"}
-                </Button>
-                <button type="button" onClick={() => { setEmail(""); setOpen("login"); }} className="block w-full text-center text-xs text-muted-foreground hover:text-foreground pt-1">
-                  ← Voltar para o login
-                </button>
-              </form>
-            </>
-          )}
-
-          {open === "forgot-sent" && (
-            <div className="flex flex-col items-center text-center gap-5 py-2">
-              <GoldPokeball />
-              <div className="h-14 w-14 -mt-2 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
-                <CheckCircle2 className="h-6 w-6 text-primary" />
-              </div>
-              <DialogTitle className="font-display text-2xl">Verifique seu email</DialogTitle>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Se o email <span className="text-foreground font-medium">{email}</span> estiver cadastrado, você receberá as instruções em breve.
-                <br /><br />Não recebeu? Verifique o spam ou aguarde alguns minutos.
-              </p>
-              <button type="button" onClick={closeModal} className="px-6 py-2 rounded-lg border border-border/70 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors">Fechar</button>
-            </div>
-          )}
-
-          {open === "reset" && (
-            <>
-              <DialogHeader className="items-center text-center space-y-0 pb-0">
-                <GoldPokeball />
-                <DialogTitle className="font-display text-2xl text-center">Nova senha</DialogTitle>
-              </DialogHeader>
-              <p className="text-center text-sm text-muted-foreground -mt-1">Digite e confirme sua nova senha.</p>
-              <form className="space-y-4" onSubmit={handleReset}>
-                <div className="space-y-2">
-                  <Label htmlFor="new-password">Nova senha</Label>
-                  <div className="relative">
-                    <Input id="new-password" type={showPassword ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Mínimo 6 caracteres" className="surface-elevated border-border/70 pr-10" autoFocus />
-                    <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" tabIndex={-1}>
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirmar nova senha</Label>
-                  <div className="relative">
-                    <Input id="confirm-password" type={showPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repita a senha" className="surface-elevated border-border/70 pr-10" />
-                    <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" tabIndex={-1}>
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-                <Button type="submit" disabled={loading} className="w-full bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold disabled:opacity-60">
-                  {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Salvando...</> : "Salvar nova senha"}
-                </Button>
-              </form>
-            </>
-          )}
-
-        </DialogContent>
-      </Dialog>
 
       {/* ── Modal de detalhe de mercado ── */}
       {marketModal && <MarketModal card={marketModal} onClose={() => setMarketModal(null)} />}

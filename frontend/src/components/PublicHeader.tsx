@@ -4,6 +4,7 @@ import { AvatarMenu } from "./AppLayout";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Crown, BookOpen, Info } from "lucide-react";
 import { getSession, clearSession } from "@/lib/auth";
+import { useAuthModal } from "@/store/useAuthModal";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -16,15 +17,11 @@ const NAV_LINKS = [
   { to: "/pricing",  label: "Planos",   icon: Crown },
 ];
 
-interface PublicHeaderProps {
-  onLoginClick?: () => void;
-  onSignupClick?: () => void;
-}
-
-export const PublicHeader = ({ onLoginClick, onSignupClick }: PublicHeaderProps) => {
+export const PublicHeader = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [session, setSession] = useState(getSession);
+  const { open: openAuth } = useAuthModal();
 
   const handleLogout = () => {
     clearSession();
@@ -81,13 +78,13 @@ export const PublicHeader = ({ onLoginClick, onSignupClick }: PublicHeaderProps)
             <>
               <Button
                 variant="ghost"
-                onClick={onLoginClick}
+                onClick={() => openAuth("login")}
                 className="text-foreground hover:bg-surface-elevated rounded-full text-sm"
               >
                 Entrar
               </Button>
               <Button
-                onClick={onSignupClick}
+                onClick={() => openAuth("signup")}
                 className="bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold transition-all rounded-full text-sm"
               >
                 Criar conta

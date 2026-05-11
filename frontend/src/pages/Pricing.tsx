@@ -92,10 +92,7 @@ const Pricing = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <PublicHeader
-        onLoginClick={() => navigate("/", { state: { openModal: "login" } })}
-        onSignupClick={() => navigate("/", { state: { openModal: "signup" } })}
-      />
+      <PublicHeader />
 
     <div className="container pt-12 pb-16">
       {/* Header */}

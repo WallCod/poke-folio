@@ -74,7 +74,7 @@ const Sets = () => {
   });
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen flex flex-col">
       <PublicHeader />
 
       <div className="container py-8 flex-1">
