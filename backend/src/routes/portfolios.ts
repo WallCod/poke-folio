@@ -242,4 +242,85 @@ router.delete('/:id/items/:itemId', requireAuth, async (req: Request, res: Respo
   res.json({ ok: true });
 });
 
+// ─── Métricas de set do usuário ────────────────────────────────────────────────
+
+// GET /api/portfolios/set-stats — progresso por set (cartas possuídas vs total no BD)
+router.get('/set-stats', requireAuth, async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  try {
+    const owned = await PortfolioItem.aggregate([
+      { $match: { userId: new Types.ObjectId(userId) } },
+      {
+        $lookup: {
+          from: 'cards',
+          localField: 'cardId',
+          foreignField: '_id',
+          as: 'card',
+        },
+      },
+      { $unwind: '$card' },
+      {
+        $group: {
+          _id:      '$card.setCode',
+          setName:  { $first: '$card.setName' },
+          ownedCount: { $addToSet: '$card.tcgId' }, // cartas únicas
+        },
+      },
+      {
+        $project: {
+          setCode:  '$_id',
+          setName:  1,
+          ownedCount: { $size: '$ownedCount' },
+        },
+      },
+      { $sort: { ownedCount: -1 } },
+    ]);
+
+    const setCodes = owned.map((o: any) => o._id).filter(Boolean);
+    const totals   = await Card.aggregate([
+      { $match: { setCode: { $in: setCodes } } },
+      { $group: { _id: '$setCode', totalInDb: { $sum: 1 } } },
+    ]);
+    const totalMap = new Map(totals.map((t: any) => [t._id, t.totalInDb]));
+
+    const result = owned.map((o: any) => ({
+      setCode:   o._id,
+      setName:   o.setName,
+      owned:     o.ownedCount,
+      totalInDb: totalMap.get(o._id) ?? o.ownedCount,
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error('[portfolios/set-stats] erro:', err);
+    res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
+// GET /api/portfolios/set-ownership/:setId — quais cartas do set o user possui
+router.get('/set-ownership/:setId', requireAuth, async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const { setId } = req.params;
+  if (!/^[a-zA-Z0-9-]+$/.test(setId)) {
+    res.status(400).json({ error: 'setId inválido.' });
+    return;
+  }
+  try {
+    const items = await PortfolioItem.find({ userId: new Types.ObjectId(userId) })
+      .populate('cardId', 'tcgId setCode');
+
+    const ownedTcgIds = new Set(
+      items
+        .filter((i) => (i.cardId as any)?.setCode === setId)
+        .map((i) => (i.cardId as any)?.tcgId)
+        .filter(Boolean)
+    );
+
+    res.json({ ownedTcgIds: [...ownedTcgIds] });
+  } catch (err) {
+    console.error('[portfolios/set-ownership] erro:', err);
+    res.status(500).json({ error: 'Erro interno.' });
+  }
+});
+
 export default router;

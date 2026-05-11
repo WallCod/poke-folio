@@ -23,10 +23,9 @@ async function todaySnapshotExists(tcgId: string): Promise<boolean> {
 export async function runDailyPriceSnapshot() {
   console.log('[PriceSnapshot] Iniciando snapshot diário de preços…');
 
-  // Pega todos os cards que já têm preço MYP (mercado BR real)
+  // Pega todos os cards com preço BRL válido (MYP + convertidos de USD/EUR)
   const cards = await Card.find({
-    priceSource: 'mypcards',
-    marketPriceBrl: { $ne: null },
+    marketPriceBrl: { $ne: null, $gt: 0 },
   }).select('tcgId name priceSource');
 
   if (!cards.length) {

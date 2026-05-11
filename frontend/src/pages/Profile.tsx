@@ -103,6 +103,11 @@ const Profile = () => {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [unlockedAchievement, setUnlockedAchievement] = useState<Achievement | null>(null);
 
+  // Set stats
+  const [setStats, setSetStats] = useState<{ setCode: string; setName: string; owned: number; totalInDb: number }[]>([]);
+  const [sets, setSets] = useState<{ id: string; total: number }[]>([]);
+  const [setStatsExpanded, setSetStatsExpanded] = useState(false);
+
   useEffect(() => {
     document.documentElement.classList.toggle("light", theme === "light");
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -114,6 +119,17 @@ const Profile = () => {
     } else if (items.length === 0) {
       fetchAllItems();
     }
+  }, []);
+
+  useEffect(() => {
+    import('@/lib/api').then(({ default: api }) => {
+      api.get('/portfolios/set-stats').then(({ data }) => setSetStats(data)).catch(() => {});
+    });
+    const baseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api').replace(/\/api$/, '');
+    fetch(`${baseUrl}/api/public/sets`)
+      .then((r) => r.json())
+      .then((d) => Array.isArray(d) && setSets(d.map((s: any) => ({ id: s.id, total: s.total }))))
+      .catch(() => {});
   }, []);
 
   // Estatísticas globais (baseado nos dados de todos os portfolios)
@@ -431,6 +447,53 @@ const Profile = () => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Progresso por set */}
+      {setStats.length > 0 && (
+        <div className="glass-panel p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="font-display text-lg font-bold flex items-center gap-2">
+              <Layers className="h-4 w-4 text-primary" />
+              Progresso por set
+            </h2>
+            <span className="text-xs text-muted-foreground">{setStats.length} sets</span>
+          </div>
+          <div className="space-y-3">
+            {(setStatsExpanded ? setStats : setStats.slice(0, 8)).map((s) => {
+              const setTotal = sets.find((t) => t.id === s.setCode)?.total ?? s.totalInDb;
+              const pct = setTotal > 0 ? Math.min(100, Math.round((s.owned / setTotal) * 100)) : 0;
+              return (
+                <div key={s.setCode}
+                  className="space-y-1 cursor-pointer group"
+                  onClick={() => navigate(`/sets/${s.setCode}`)}
+                >
+                  <div className="flex items-center justify-between text-sm gap-2">
+                    <span className="font-medium truncate group-hover:text-primary transition-colors">{s.setName}</span>
+                    <span className="text-muted-foreground shrink-0 font-mono text-xs">
+                      <span className="text-primary font-semibold">{s.owned}</span>/{setTotal}
+                      <span className="ml-1.5 text-muted-foreground/60">({pct}%)</span>
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-border overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-gold transition-all duration-500"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {setStats.length > 8 && (
+            <button
+              onClick={() => setSetStatsExpanded((v) => !v)}
+              className="text-xs text-muted-foreground mt-4 hover:text-foreground transition-colors"
+            >
+              {setStatsExpanded ? "Mostrar menos" : `Ver todos os ${setStats.length} sets →`}
+            </button>
+          )}
         </div>
       )}
 

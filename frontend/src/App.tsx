@@ -18,6 +18,7 @@ import GuiaTcg from "./pages/GuiaTcg.tsx";
 import Sobre from "./pages/Sobre.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import VerifyEmail from "./pages/VerifyEmail.tsx";
+import SetDetail from "./pages/SetDetail.tsx";
 
 import { AdminRoute } from "./admin/AdminRoute";
 import { AdminLayout } from "./admin/AdminLayout";
@@ -49,6 +50,7 @@ const App = () => (
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/guia-tcg" element={<GuiaTcg />} />
           <Route path="/sobre" element={<Sobre />} />
+          <Route path="/sets/:setId" element={<SetDetail />} />
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/collection" element={<Collection />} />
