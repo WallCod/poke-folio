@@ -117,7 +117,10 @@ export const AppLayout = () => {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Top navbar — desktop */}
-      <header className="hidden md:block sticky top-0 z-40 backdrop-blur-xl bg-background/70 border-b border-border/60">
+      <header className="hidden md:block sticky top-0 z-40 backdrop-blur-xl bg-background/70 border-b border-border/60 relative">
+        <div className="absolute bottom-0 left-0 right-0 h-px pointer-events-none"
+          style={{ background: "linear-gradient(90deg, #FF6A00, #1B87E6, #3DAD4C, #DAA800, #E8579A, #C03028, #4A4878, #8BA6BB, #5060C0, #DA6FC8, #A0A0B8)" }}
+        />
         <div className="container flex h-16 items-center justify-between gap-6">
           <Logo />
 
@@ -157,7 +160,10 @@ export const AppLayout = () => {
       </header>
 
       {/* Mobile top bar */}
-      <header className="md:hidden sticky top-0 z-40 backdrop-blur-xl bg-background/80 border-b border-border/60">
+      <header className="md:hidden sticky top-0 z-40 backdrop-blur-xl bg-background/80 border-b border-border/60 relative">
+        <div className="absolute bottom-0 left-0 right-0 h-px pointer-events-none"
+          style={{ background: "linear-gradient(90deg, #FF6A00, #1B87E6, #3DAD4C, #DAA800, #E8579A, #C03028, #4A4878, #8BA6BB, #5060C0, #DA6FC8, #A0A0B8)" }}
+        />
         <div className="container flex h-14 items-center justify-between">
           <Logo />
           <AvatarMenu
@@ -173,6 +179,15 @@ export const AppLayout = () => {
       <main className="flex-1 pb-24 md:pb-12">
         <Outlet />
       </main>
+
+      {/* Footer desktop — oculto no mobile por causa do nav bottom */}
+      <footer className="hidden md:flex container py-4 border-t border-border/50 text-xs text-muted-foreground items-center justify-between relative">
+        <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+          style={{ background: "linear-gradient(90deg, #FF6A00, #1B87E6, #3DAD4C, #DAA800, #E8579A, #C03028, #4A4878, #8BA6BB, #5060C0, #DA6FC8, #A0A0B8)" }}
+        />
+        <p>© {new Date().getFullYear()} Pokéfolio. Feito por colecionadores.</p>
+        <p>Não afiliado a The Pokémon Company.</p>
+      </footer>
 
       {/* Bottom nav — mobile */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 backdrop-blur-xl bg-background/85 border-t border-border/60">

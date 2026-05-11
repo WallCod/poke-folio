@@ -13,7 +13,7 @@ import {
   Zap, Crown, Loader2, Eye, EyeOff, CheckCircle2, Star,
 } from "lucide-react";
 import heroImage from "@/assets/hero-cards.jpg";
-import { EnergyIcon, ENERGY_TYPES_TCG } from "@/components/EnergyIcon";
+import { EnergyIcon } from "@/components/EnergyIcon";
 import { mockLogin, setSessionFromApi, getSession, clearSession } from "@/lib/auth";
 import { authApi } from "@/lib/api";
 import api from "@/lib/api";
@@ -381,17 +381,25 @@ const Landing = () => {
       <CardDecor className="absolute right-[14%] top-[30%] w-10 text-primary opacity-[0.08] -rotate-6 pointer-events-none hidden lg:block" />
       <CardDecor className="absolute left-[6%] top-[35%] w-12 text-primary opacity-[0.07] rotate-[-15deg] pointer-events-none hidden lg:block" />
 
-      {/* ── Header ── */}
-      <header className="container py-6 flex items-center justify-between relative z-10">
-        <Logo />
-        <nav className="hidden sm:flex items-center gap-1">
-          <Link to="/guia-tcg" className="px-3.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors">Guia TCG</Link>
-          <Link to="/sobre" className="px-3.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors">Sobre</Link>
-          <Link to="/pricing" className="px-3.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors flex items-center gap-1.5">
-            <Crown className="h-3.5 w-3.5 text-primary" /> Planos
-          </Link>
-        </nav>
-        <div className="flex items-center gap-3">
+      {/* ── Header fixo ── */}
+      <header className="sticky top-0 z-50 w-full backdrop-blur-xl bg-background/75 border-b border-border/60">
+        {/* Linha de tipos no fundo do header */}
+        <div className="absolute bottom-0 left-0 right-0 h-px pointer-events-none"
+          style={{ background: "linear-gradient(90deg, #FF6A00, #1B87E6, #3DAD4C, #DAA800, #E8579A, #C03028, #4A4878, #8BA6BB, #5060C0, #DA6FC8, #A0A0B8)" }}
+        />
+        <div className="container flex h-16 items-center justify-between gap-4">
+          <Logo />
+          <nav className="hidden sm:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
+            <Link to="/guia-tcg" className="px-3.5 py-2 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors">Guia TCG</Link>
+            <Link to="/sobre" className="px-3.5 py-2 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors">Sobre</Link>
+            <Link to="/sets" className="px-3.5 py-2 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5 text-primary" /> Sets
+            </Link>
+            <Link to="/pricing" className="px-3.5 py-2 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors flex items-center gap-1.5">
+              <Crown className="h-3.5 w-3.5 text-primary" /> Planos
+            </Link>
+          </nav>
+          <div className="flex items-center gap-2">
           {session ? (
             <>
               <span className="text-sm text-muted-foreground hidden sm:block">Olá, <strong className="text-foreground">{session.name}</strong></span>
@@ -399,8 +407,8 @@ const Landing = () => {
             </>
           ) : (
             <>
-              <Button variant="ghost" onClick={() => setOpen("login")} className="text-foreground hover:bg-surface-elevated">Entrar</Button>
-              <Button onClick={() => setOpen("signup")} className="bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold transition-all">Criar conta</Button>
+              <Button variant="ghost" onClick={() => setOpen("login")} className="text-foreground hover:bg-surface-elevated rounded-full">Entrar</Button>
+              <Button onClick={() => setOpen("signup")} className="bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold transition-all rounded-full">Criar conta</Button>
             </>
           )}
         </div>
@@ -471,22 +479,6 @@ const Landing = () => {
           </div>
         </div>
       </section>
-
-      {/* ── Banner de tipos com EnergyIcons reais ── */}
-      <div className="w-full overflow-hidden border-y border-border/30 bg-background/50 backdrop-blur py-3 mb-2">
-        <div className="flex gap-3 animate-[scroll_35s_linear_infinite] w-max">
-          {[...ENERGY_TYPES_TCG, ...ENERGY_TYPES_TCG].map((t, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium shrink-0 transition-colors"
-              style={{ borderColor: t.color + "45", color: t.color, background: t.color + "12" }}
-            >
-              <EnergyIcon type={t.type} size={18} />
-              <span>{t.name}</span>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* ── Seção: Trending / Mercado ── */}
       <section className="container py-14 relative">

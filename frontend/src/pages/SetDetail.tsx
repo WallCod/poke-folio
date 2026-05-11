@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Check, Plus, Loader2, Lock, Star } from "lucide-react";
+import { ArrowLeft, Check, Plus, Loader2, Lock, Star, X, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EnergyIcon } from "@/components/EnergyIcon";
 import { getSession } from "@/lib/auth";
@@ -33,25 +33,156 @@ interface SetInfo {
 }
 
 const RARITY_COLOR: Record<string, string> = {
-  "Common":                "text-gray-400",
-  "Uncommon":              "text-green-400",
-  "Rare":                  "text-blue-400",
-  "Rare Holo":             "text-blue-400",
-  "Rare Holo EX":          "text-purple-400",
-  "Rare Holo GX":          "text-purple-400",
-  "Rare Holo V":           "text-purple-400",
-  "Rare Ultra":            "text-yellow-400",
-  "Rare Secret":           "text-pink-400",
-  "Rare Rainbow":          "text-pink-400",
-  "Promo":                 "text-orange-400",
-  "Illustration Rare":     "text-indigo-400",
-  "Special Illustration Rare": "text-pink-400",
-  "Hyper Rare":            "text-yellow-300",
+  "Common":                     "text-gray-400",
+  "Uncommon":                   "text-green-400",
+  "Rare":                       "text-blue-400",
+  "Rare Holo":                  "text-blue-400",
+  "Rare Holo EX":               "text-purple-400",
+  "Rare Holo GX":               "text-purple-400",
+  "Rare Holo V":                "text-purple-400",
+  "Rare Ultra":                 "text-yellow-400",
+  "Rare Secret":                "text-pink-400",
+  "Rare Rainbow":               "text-pink-400",
+  "Promo":                      "text-orange-400",
+  "Illustration Rare":          "text-indigo-400",
+  "Special Illustration Rare":  "text-pink-400",
+  "Hyper Rare":                 "text-yellow-300",
 };
 
 function rarityColor(rarity: string): string {
   return RARITY_COLOR[rarity] ?? "text-muted-foreground";
 }
+
+// ─── Card Detail Modal ────────────────────────────────────────────────────────
+
+function CardModal({
+  card,
+  owned,
+  loggedIn,
+  adding,
+  onAdd,
+  onClose,
+  onLoginRequired,
+  setId,
+}: {
+  card: SetCard;
+  owned: boolean;
+  loggedIn: boolean;
+  adding: boolean;
+  onAdd: (card: SetCard) => void;
+  onClose: () => void;
+  onLoginRequired: () => void;
+  setId: string;
+}) {
+  const [imgErr, setImgErr] = useState(false);
+  const mypLink = `https://www.mypcards.com/search?q=${encodeURIComponent(card.name)}`;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative bg-card border border-border/70 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 z-10 p-1.5 rounded-full bg-background/60 hover:bg-surface-elevated text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        {/* Imagem */}
+        <div className="aspect-[2.5/3.5] bg-card/40 relative">
+          {card.imageUrl && !imgErr ? (
+            <img
+              src={card.imageUrl}
+              alt={card.name}
+              className="w-full h-full object-cover"
+              onError={() => setImgErr(true)}
+            />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-card/40">
+              {card.types[0] && <EnergyIcon type={card.types[0]} size={40} />}
+              <span className="text-sm text-muted-foreground">{card.name}</span>
+            </div>
+          )}
+          {owned && (
+            <div className="absolute top-2 left-2 flex items-center gap-1 bg-primary/90 text-background text-[10px] font-bold px-2 py-1 rounded-full">
+              <Check className="h-3 w-3" /> Na coleção
+            </div>
+          )}
+        </div>
+
+        {/* Info */}
+        <div className="p-4 space-y-3">
+          <div>
+            <h3 className="font-display font-bold text-lg leading-tight">{card.name}</h3>
+            <p className="text-sm text-muted-foreground">{card.setName} · #{card.number}</p>
+          </div>
+
+          <div className="flex flex-wrap gap-2 text-xs">
+            {card.rarity && (
+              <span className={cn("font-semibold", rarityColor(card.rarity))}>{card.rarity}</span>
+            )}
+            {card.supertype && (
+              <span className="text-muted-foreground">{card.supertype}</span>
+            )}
+            {card.hp && (
+              <span className="text-muted-foreground">HP {card.hp}</span>
+            )}
+            {card.types.map((t) => (
+              <span key={t} className="flex items-center gap-0.5 text-muted-foreground">
+                <EnergyIcon type={t} size={12} /> {t}
+              </span>
+            ))}
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            {loggedIn ? (
+              <Button
+                className={cn(
+                  "flex-1 text-sm font-semibold",
+                  owned
+                    ? "bg-primary/20 text-primary border border-primary/40 hover:bg-primary/30"
+                    : "bg-gradient-gold text-background hover:opacity-90"
+                )}
+                disabled={adding || owned}
+                onClick={() => !owned && onAdd(card)}
+              >
+                {adding ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : owned ? (
+                  <><Check className="h-4 w-4 mr-1" /> Tenho essa</>
+                ) : (
+                  <><Plus className="h-4 w-4 mr-1" /> Adicionar à coleção</>
+                )}
+              </Button>
+            ) : (
+              <Button
+                className="flex-1 text-sm border border-border/60 bg-card/60 hover:bg-surface-elevated"
+                onClick={onLoginRequired}
+              >
+                <Lock className="h-4 w-4 mr-1" /> Entrar para marcar
+              </Button>
+            )}
+            <a
+              href={mypLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-md border border-border/60 text-xs text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> MYP
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Card Tile ────────────────────────────────────────────────────────────────
 
 function CardTile({
   card,
@@ -60,6 +191,7 @@ function CardTile({
   adding,
   onAdd,
   onLoginRequired,
+  onOpenModal,
 }: {
   card: SetCard;
   owned: boolean;
@@ -67,6 +199,7 @@ function CardTile({
   adding: boolean;
   onAdd: (card: SetCard) => void;
   onLoginRequired: () => void;
+  onOpenModal: (card: SetCard) => void;
 }) {
   const [imgErr, setImgErr] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -74,7 +207,7 @@ function CardTile({
   return (
     <div
       className={cn(
-        "relative group rounded-xl overflow-hidden border transition-all duration-200",
+        "relative group rounded-xl overflow-hidden border transition-all duration-200 cursor-pointer",
         owned
           ? "border-primary/50 shadow-[0_0_12px_-4px_hsl(48_100%_50%/0.4)]"
           : "border-border/40 hover:border-border/70"
@@ -99,14 +232,12 @@ function CardTile({
           </div>
         )}
 
-        {/* Overlay de owned */}
         {owned && (
           <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-primary flex items-center justify-center shadow">
             <Check className="h-3 w-3 text-background" />
           </div>
         )}
 
-        {/* Overlay de ação no hover */}
         {hovered && (
           <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center gap-2 p-2">
             <p className="text-xs font-semibold text-center leading-tight">{card.name}</p>
@@ -114,35 +245,44 @@ function CardTile({
             {card.number && (
               <p className="text-[10px] text-muted-foreground">#{card.number}</p>
             )}
-            {loggedIn ? (
+            <div className="flex flex-col gap-1 w-full mt-1">
               <Button
                 size="sm"
-                className={cn(
-                  "h-7 text-[10px] px-2 mt-1",
-                  owned
-                    ? "bg-primary/20 text-primary border border-primary/40 hover:bg-primary/30"
-                    : "bg-gradient-gold text-background hover:opacity-90"
-                )}
-                onClick={() => !owned && onAdd(card)}
-                disabled={adding}
+                className="h-7 text-[10px] px-2 border border-border/60 bg-card/60 hover:bg-surface-elevated"
+                onClick={() => onOpenModal(card)}
               >
-                {adding ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : owned ? (
-                  <><Check className="h-3 w-3 mr-1" /> Tenho</>
-                ) : (
-                  <><Plus className="h-3 w-3 mr-1" /> Tenho essa</>
-                )}
+                Ver detalhes
               </Button>
-            ) : (
-              <Button
-                size="sm"
-                className="h-7 text-[10px] px-2 mt-1 border border-border/60 bg-card/60 hover:bg-surface-elevated"
-                onClick={onLoginRequired}
-              >
-                <Lock className="h-3 w-3 mr-1" /> Marcar
-              </Button>
-            )}
+              {loggedIn ? (
+                <Button
+                  size="sm"
+                  className={cn(
+                    "h-7 text-[10px] px-2",
+                    owned
+                      ? "bg-primary/20 text-primary border border-primary/40 hover:bg-primary/30"
+                      : "bg-gradient-gold text-background hover:opacity-90"
+                  )}
+                  onClick={() => !owned && onAdd(card)}
+                  disabled={adding}
+                >
+                  {adding ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : owned ? (
+                    <><Check className="h-3 w-3 mr-1" /> Tenho</>
+                  ) : (
+                    <><Plus className="h-3 w-3 mr-1" /> Tenho essa</>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  className="h-7 text-[10px] px-2 border border-border/60 bg-card/60 hover:bg-surface-elevated"
+                  onClick={onLoginRequired}
+                >
+                  <Lock className="h-3 w-3 mr-1" /> Marcar
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -159,6 +299,8 @@ function CardTile({
   );
 }
 
+// ─── SetDetail ────────────────────────────────────────────────────────────────
+
 const SetDetail = () => {
   const { setId } = useParams<{ setId: string }>();
   const navigate = useNavigate();
@@ -172,17 +314,16 @@ const SetDetail = () => {
   const [addingId, setAddingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("all");
   const [rarityFilter, setRarityFilter] = useState<string>("all");
+  const [selectedCard, setSelectedCard] = useState<SetCard | null>(null);
 
   const { portfolios, fetchPortfolios, addItem } = usePortfolios();
 
   const baseUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3001/api").replace(/\/api$/, "");
 
-  // Carrega info do set e cartas
   useEffect(() => {
     if (!setId) return;
     setLoading(true);
 
-    // Info do set (da lista de sets)
     fetch(`${baseUrl}/api/public/sets`)
       .then((r) => r.json())
       .then((data: SetInfo[]) => {
@@ -191,7 +332,6 @@ const SetDetail = () => {
       })
       .catch(() => {});
 
-    // Cartas do set
     fetch(`${baseUrl}/api/public/sets/${setId}/cards`)
       .then((r) => r.json())
       .then((data) => {
@@ -201,7 +341,6 @@ const SetDetail = () => {
       .finally(() => setLoading(false));
   }, [setId]);
 
-  // Carrega ownership do usuário logado
   useEffect(() => {
     if (!session || !setId) return;
     setOwnershipLoading(true);
@@ -213,7 +352,6 @@ const SetDetail = () => {
       .finally(() => setOwnershipLoading(false));
   }, [session, setId]);
 
-  // Carrega portfólios se logado
   useEffect(() => {
     if (session && !portfolios.length) fetchPortfolios();
   }, [session]);
@@ -250,6 +388,7 @@ const SetDetail = () => {
         }
       );
       setOwnedIds((prev) => new Set([...prev, card.tcgId]));
+      modal.success("Adicionado!", `${card.name} adicionada à sua coleção.`);
     } catch {
       modal.error("Erro", "Não foi possível adicionar a carta.");
     } finally {
@@ -261,7 +400,14 @@ const SetDetail = () => {
     navigate("/", { state: { openModal: "signup" } });
   };
 
-  // Tipos únicos presentes no set
+  const handleBack = () => {
+    if (window.history.length > 2) {
+      navigate(-1);
+    } else {
+      navigate("/sets");
+    }
+  };
+
   const allTypes = Array.from(new Set(cards.flatMap((c) => c.types))).filter(Boolean).sort();
   const allRarities = Array.from(new Set(cards.map((c) => c.rarity))).filter(Boolean).sort();
 
@@ -278,10 +424,13 @@ const SetDetail = () => {
     <div className="min-h-screen bg-background">
 
       {/* Header */}
-      <div className="border-b border-border/50 bg-card/40 backdrop-blur sticky top-0 z-20">
+      <div className="border-b border-border/50 bg-card/40 backdrop-blur sticky top-0 z-20 relative">
+        <div className="absolute bottom-0 left-0 right-0 h-px pointer-events-none"
+          style={{ background: "linear-gradient(90deg, #FF6A00, #1B87E6, #3DAD4C, #DAA800, #E8579A, #C03028, #4A4878, #8BA6BB, #5060C0, #DA6FC8, #A0A0B8)" }}
+        />
         <div className="container flex items-center gap-4 py-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="p-2 rounded-lg hover:bg-surface-elevated transition-colors text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -340,7 +489,6 @@ const SetDetail = () => {
         {/* Filtros */}
         {!loading && cards.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-5">
-            {/* Filtro por tipo */}
             <div className="flex items-center gap-1 flex-wrap">
               <button
                 onClick={() => setFilter("all")}
@@ -370,7 +518,6 @@ const SetDetail = () => {
               ))}
             </div>
 
-            {/* Filtro por raridade */}
             <select
               value={rarityFilter}
               onChange={(e) => setRarityFilter(e.target.value)}
@@ -417,6 +564,7 @@ const SetDetail = () => {
                 adding={addingId === card.tcgId}
                 onAdd={handleAdd}
                 onLoginRequired={handleLoginRequired}
+                onOpenModal={setSelectedCard}
               />
             ))}
           </div>
@@ -438,6 +586,29 @@ const SetDetail = () => {
           </div>
         )}
       </div>
+
+      {/* Footer */}
+      <footer className="container py-4 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between relative mt-4">
+        <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+          style={{ background: "linear-gradient(90deg, #FF6A00, #1B87E6, #3DAD4C, #DAA800, #E8579A, #C03028, #4A4878, #8BA6BB, #5060C0, #DA6FC8, #A0A0B8)" }}
+        />
+        <p>© {new Date().getFullYear()} Pokéfolio.</p>
+        <p>Não afiliado a The Pokémon Company.</p>
+      </footer>
+
+      {/* Modal de detalhe da carta */}
+      {selectedCard && (
+        <CardModal
+          card={selectedCard}
+          owned={ownedIds.has(selectedCard.tcgId)}
+          loggedIn={!!session}
+          adding={addingId === selectedCard.tcgId}
+          onAdd={handleAdd}
+          onClose={() => setSelectedCard(null)}
+          onLoginRequired={handleLoginRequired}
+          setId={setId ?? ""}
+        />
+      )}
     </div>
   );
 };

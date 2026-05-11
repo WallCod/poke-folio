@@ -310,4 +310,38 @@ router.get('/me', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// ─── PATCH /api/auth/me ───────────────────────────────────────────────────────
+router.patch('/me', async (req: Request, res: Response): Promise<void> => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) {
+    res.status(401).json({ error: 'Token não fornecido' });
+    return;
+  }
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET!) as { id: string };
+    const { name } = req.body as { name?: string };
+
+    if (!name || name.trim().length < 2 || name.trim().length > 80) {
+      res.status(422).json({ error: 'Nome deve ter entre 2 e 80 caracteres.' });
+      return;
+    }
+
+    const user = await User.findByIdAndUpdate(
+      payload.id,
+      { name: name.trim() },
+      { new: true }
+    );
+    if (!user) {
+      res.status(404).json({ error: 'Usuário não encontrado' });
+      return;
+    }
+
+    res.json({ name: user.name });
+  } catch {
+    res.status(401).json({ error: 'Token inválido' });
+  }
+});
+
 export default router;

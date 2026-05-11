@@ -1,0 +1,180 @@
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { Sparkles, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+
+interface TcgSet {
+  id: string;
+  name: string;
+  series: string;
+  releaseDate: string;
+  total: number;
+  logo: string | null;
+  symbol: string | null;
+}
+
+function SetCard({ set }: { set: TcgSet }) {
+  const [logoErr, setLogoErr] = useState(false);
+  const year = set.releaseDate?.split("-")[0] ?? "";
+  return (
+    <Link to={`/sets/${set.id}`} className="group block h-full">
+      <div className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border/50 bg-card/50 hover:bg-card/80 hover:border-primary/30 hover:shadow-[0_0_20px_-8px_hsl(48_100%_50%/0.3)] transition-all duration-200 h-full">
+        <div className="h-10 flex items-center justify-center w-full">
+          {set.logo && !logoErr ? (
+            <img
+              src={set.logo}
+              alt={set.name}
+              className="max-h-8 max-w-full object-contain opacity-80 group-hover:opacity-100 transition-opacity"
+              onError={() => setLogoErr(true)}
+            />
+          ) : (
+            <p className="text-xs font-bold text-muted-foreground text-center line-clamp-2">{set.name}</p>
+          )}
+        </div>
+        <div className="text-center w-full">
+          {set.logo && !logoErr && (
+            <p className="text-[10px] text-muted-foreground truncate">{set.name}</p>
+          )}
+          <div className="flex items-center justify-center gap-1.5 mt-0.5">
+            {set.symbol && (
+              <img src={set.symbol} alt="" className="h-3 w-3 object-contain opacity-50" />
+            )}
+            <p className="text-[10px] text-muted-foreground/60">{year} · {set.total} cartas</p>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+const Sets = () => {
+  const [sets, setSets] = useState<TcgSet[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [seriesFilter, setSeriesFilter] = useState("all");
+  const [search, setSearch] = useState("");
+
+  const baseUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3001/api").replace(/\/api$/, "");
+
+  useEffect(() => {
+    fetch(`${baseUrl}/api/public/sets`)
+      .then((r) => r.json())
+      .then((d) => Array.isArray(d) && setSets(d))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const allSeries = Array.from(new Set(sets.map((s) => s.series))).filter(Boolean);
+
+  const filtered = sets.filter((s) => {
+    const seriesOk = seriesFilter === "all" || s.series === seriesFilter;
+    const searchOk = !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.series.toLowerCase().includes(search.toLowerCase());
+    return seriesOk && searchOk;
+  });
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="border-b border-border/50 bg-card/40 backdrop-blur sticky top-0 z-20 relative">
+        <div className="absolute bottom-0 left-0 right-0 h-px pointer-events-none"
+          style={{ background: "linear-gradient(90deg, #FF6A00, #1B87E6, #3DAD4C, #DAA800, #E8579A, #C03028, #4A4878, #8BA6BB, #5060C0, #DA6FC8, #A0A0B8)" }}
+        />
+        <div className="container flex items-center gap-4 py-4">
+          <Link to="/" className="p-2 rounded-lg hover:bg-surface-elevated transition-colors text-muted-foreground hover:text-foreground">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5M12 5l-7 7 7 7" />
+            </svg>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <h1 className="font-display font-bold text-xl">Todos os Sets</h1>
+          </div>
+          <p className="text-xs text-muted-foreground hidden sm:block">
+            {loading ? "Carregando..." : `${sets.length} sets disponíveis`}
+          </p>
+        </div>
+      </div>
+
+      <div className="container py-6">
+        {/* Busca + filtros */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Buscar set..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 h-9 text-sm bg-card/60 border-border/60"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              onClick={() => setSeriesFilter("all")}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                seriesFilter === "all"
+                  ? "bg-primary/15 text-primary border-primary/30"
+                  : "border-border/50 text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Todos
+            </button>
+            {allSeries.map((s) => (
+              <button
+                key={s}
+                onClick={() => setSeriesFilter(s)}
+                className={cn(
+                  "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                  seriesFilter === s
+                    ? "bg-primary/15 text-primary border-primary/30"
+                    : "border-border/50 text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Contagem */}
+        {!loading && (
+          <p className="text-xs text-muted-foreground mb-4">
+            {filtered.length === sets.length ? `${sets.length} sets` : `${filtered.length} de ${sets.length} sets`}
+          </p>
+        )}
+
+        {/* Grid */}
+        {loading ? (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+            {Array.from({ length: 32 }).map((_, i) => (
+              <div key={i} className="aspect-[1/1.1] rounded-xl bg-card/40 animate-pulse border border-border/30" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground">
+            <Sparkles className="h-10 w-10 mx-auto mb-3 opacity-20" />
+            <p>Nenhum set encontrado.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+            {filtered.map((set) => (
+              <SetCard key={set.id} set={set} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <footer className="container py-4 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between relative mt-8">
+        <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+          style={{ background: "linear-gradient(90deg, #FF6A00, #1B87E6, #3DAD4C, #DAA800, #E8579A, #C03028, #4A4878, #8BA6BB, #5060C0, #DA6FC8, #A0A0B8)" }}
+        />
+        <p>© {new Date().getFullYear()} Pokéfolio.</p>
+        <p>Não afiliado a The Pokémon Company.</p>
+      </footer>
+    </div>
+  );
+};
+
+export default Sets;

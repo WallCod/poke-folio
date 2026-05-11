@@ -3,12 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { usePortfolios } from "@/store/usePortfolios";
 import { useUser } from "@/store/useCollection";
 import { formatCurrency } from "@/lib/format";
-import { getSession, clearSession } from "@/lib/auth";
+import { getSession, clearSession, setSession } from "@/lib/auth";
 import { modal } from "@/store/useAppModal";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -37,6 +38,7 @@ import {
   Clock,
   Crown,
   Sparkles,
+  Pencil,
 } from "lucide-react";
 
 const rarityWeight: Record<string, number> = {
@@ -102,6 +104,10 @@ const Profile = () => {
 
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [unlockedAchievement, setUnlockedAchievement] = useState<Achievement | null>(null);
+  const [editNameOpen, setEditNameOpen] = useState(false);
+  const [editNameValue, setEditNameValue] = useState(session?.name ?? "");
+  const [editNameLoading, setEditNameLoading] = useState(false);
+  const displayName = session?.name && session.name !== "Treinador" ? session.name : user.name;
 
   // Set stats
   const [setStats, setSetStats] = useState<{ setCode: string; setName: string; owned: number; totalInDb: number }[]>([]);
@@ -131,6 +137,31 @@ const Profile = () => {
       .then((d) => Array.isArray(d) && setSets(d.map((s: any) => ({ id: s.id, total: s.total }))))
       .catch(() => {});
   }, []);
+
+  const handleEditName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = editNameValue.trim();
+    if (trimmed.length < 2) {
+      modal.error("Nome inválido", "O nome deve ter pelo menos 2 caracteres.");
+      return;
+    }
+    setEditNameLoading(true);
+    try {
+      const { default: api } = await import('@/lib/api');
+      await api.patch('/auth/me', { name: trimmed });
+      const currentSession = getSession();
+      if (currentSession) {
+        setSession({ ...currentSession, name: trimmed });
+      }
+      setEditNameOpen(false);
+      modal.success("Nome atualizado!", `Seu nome foi alterado para ${trimmed}.`);
+      window.location.reload();
+    } catch (err: unknown) {
+      modal.error("Erro", (err as any)?.response?.data?.error ?? "Não foi possível atualizar.");
+    } finally {
+      setEditNameLoading(false);
+    }
+  };
 
   // Estatísticas globais (baseado nos dados de todos os portfolios)
   const globalTotalCards = portfolios.reduce((s, p) => s + p.totalCards, 0);
@@ -256,7 +287,7 @@ const Profile = () => {
           <div className="relative shrink-0">
             <div className="h-24 w-24 md:h-28 md:w-28 rounded-2xl bg-gradient-gold flex items-center justify-center shadow-glow-gold">
               <span className="font-display text-5xl font-bold text-background select-none">
-                {user.name.charAt(0).toUpperCase()}
+                {displayName.charAt(0).toUpperCase()}
               </span>
             </div>
             {isAdmin && (
@@ -267,10 +298,19 @@ const Profile = () => {
           </div>
 
           <div className="flex-1 text-center sm:text-left min-w-0">
-            <h1 className="font-display text-2xl md:text-3xl font-bold truncate">
-              {user.name}
-            </h1>
-            <p className="text-muted-foreground text-sm mt-0.5">{user.email}</p>
+            <div className="flex items-center gap-2 justify-center sm:justify-start">
+              <h1 className="font-display text-2xl md:text-3xl font-bold truncate">
+                {displayName}
+              </h1>
+              <button
+                onClick={() => { setEditNameValue(displayName); setEditNameOpen(true); }}
+                className="p-1.5 rounded-lg hover:bg-surface-elevated text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                title="Editar nome"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-muted-foreground text-sm mt-0.5">{user.email || session?.email}</p>
 
             <div className="mt-4 flex flex-wrap gap-2 justify-center sm:justify-start">
               <span
@@ -627,6 +667,46 @@ const Profile = () => {
           </Button>
         </div>
       </div>
+
+      {/* Dialog — editar nome */}
+      <Dialog open={editNameOpen} onOpenChange={(v) => !v && setEditNameOpen(false)}>
+        <DialogContent className="bg-card border-border/70 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl">Editar nome</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditName} className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Seu nome</Label>
+              <Input
+                id="edit-name"
+                value={editNameValue}
+                onChange={(e) => setEditNameValue(e.target.value)}
+                placeholder="Como devemos te chamar?"
+                className="surface-elevated border-border/70"
+                autoFocus
+                maxLength={80}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 border-border/60"
+                onClick={() => setEditNameOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-gradient-gold text-background font-semibold hover:opacity-90"
+                disabled={editNameLoading || editNameValue.trim().length < 2}
+              >
+                {editNameLoading ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
