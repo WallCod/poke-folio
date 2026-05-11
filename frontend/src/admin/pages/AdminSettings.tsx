@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toast } from "sonner";
+import { modal } from "@/store/useAppModal";
 import { getSettings, saveSettings, type AppSettings } from "@/lib/storage";
 
 const Section = ({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) => (
@@ -68,12 +68,12 @@ const AdminSettings = () => {
 
   const saveLimits = () => {
     saveSettings(settings);
-    toast.success("Limites dos planos salvos");
+    modal.success("Limites salvos", "Os limites dos planos foram atualizados.");
   };
 
   const saveAll = () => {
     saveSettings(settings);
-    toast.success("Configurações salvas com sucesso");
+    modal.success("Configurações salvas", "Todas as alterações foram aplicadas com sucesso.");
   };
 
   return (

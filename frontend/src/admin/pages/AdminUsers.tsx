@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { toast } from "sonner";
+import { modal } from "@/store/useAppModal";
 import {
   getUsers,
   updateUser,
@@ -97,26 +97,26 @@ const AdminUsers = () => {
     updateUser(changePlanTarget.id, { plan: selectedPlan });
     reload();
     setChangePlanTarget(null);
-    toast.success(`Plano de ${changePlanTarget.name} alterado para ${PLAN_LABELS[selectedPlan]}`);
+    modal.success("Plano alterado", `${changePlanTarget.name} agora está no plano ${PLAN_LABELS[selectedPlan]}.`);
   };
 
   const handleSuspend = (u: StoredUser) => {
     updateUser(u.id, { planStatus: "suspended", plan: "free" });
     reload();
-    toast.success(`Conta de ${u.name} suspensa`);
+    modal.warning("Conta suspensa", `A conta de ${u.name} foi suspensa.`);
   };
 
   const handleReactivate = (u: StoredUser) => {
     updateUser(u.id, { planStatus: "active" });
     reload();
-    toast.success(`Conta de ${u.name} reativada`);
+    modal.success("Conta reativada", `A conta de ${u.name} está ativa novamente.`);
   };
 
   const handleDelete = () => {
     if (!deleteTarget) return;
     deleteUser(deleteTarget.id);
     reload();
-    toast.success(`Usuário ${deleteTarget.name} excluído`);
+    modal.success("Usuário excluído", `${deleteTarget.name} foi removido da plataforma.`);
     setDeleteTarget(null);
   };
 

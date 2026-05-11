@@ -5,7 +5,7 @@ export const AdminRoute = () => {
   const location = useLocation();
   const session = getSession();
   if (!session?.token || session.role !== "admin") {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to="/" replace state={{ from: location }} />;
   }
   return <Outlet />;
 };

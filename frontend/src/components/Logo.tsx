@@ -2,10 +2,10 @@ import { Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
-export const Logo = ({ className }: { className?: string }) => (
+export const Logo = ({ className, to = "/" }: { className?: string; to?: string }) => (
   <Link
-    to="/"
-    aria-label="Pokéfolio — voltar à home"
+    to={to}
+    aria-label="Pokéfolio"
     className={cn("flex items-center gap-2 group", className)}
   >
     <div className="relative h-8 w-8 rounded-full bg-gradient-gold flex items-center justify-center shadow-glow-gold">

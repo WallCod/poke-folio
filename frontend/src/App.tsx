@@ -5,15 +5,19 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/AppLayout";
 import { BackToTop } from "@/components/BackToTop";
+import { ScrollToTop } from "@/components/ScrollToTop";
+import { AppModal } from "@/components/AppModal";
 import Landing from "./pages/Landing.tsx";
-import Login from "./pages/Login.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import Collection from "./pages/Collection.tsx";
 import Catalog from "./pages/Catalog.tsx";
 import Prices from "./pages/Prices.tsx";
 import Profile from "./pages/Profile.tsx";
 import Pricing from "./pages/Pricing.tsx";
+import GuiaTcg from "./pages/GuiaTcg.tsx";
+import Sobre from "./pages/Sobre.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import VerifyEmail from "./pages/VerifyEmail.tsx";
 
 import { AdminRoute } from "./admin/AdminRoute";
 import { AdminLayout } from "./admin/AdminLayout";
@@ -36,16 +40,20 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner position="bottom-left" />
+      <AppModal />
       <BrowserRouter>
+        <ScrollToTop />
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/guia-tcg" element={<GuiaTcg />} />
+          <Route path="/sobre" element={<Sobre />} />
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/collection" element={<Collection />} />
             <Route path="/catalog" element={<Catalog />} />
             <Route path="/prices" element={<Prices />} />
-            <Route path="/pricing" element={<Pricing />} />
             <Route path="/profile" element={<Profile />} />
           </Route>
 

@@ -19,7 +19,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Search, Plus, Minus } from "lucide-react";
 import { useCollection, type Condition } from "@/store/useCollection";
-import { toast } from "sonner";
+import { modal } from "@/store/useAppModal";
 import { useNavigate } from "react-router-dom";
 import { getSession } from "@/lib/auth";
 import { getUsers, getSettings } from "@/lib/storage";
@@ -50,12 +50,16 @@ export const AddCardModal = ({ open, onOpenChange }: Props) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!search.trim()) {
-      toast.error("Digite o nome de uma carta");
+      modal.error("Nome obrigatório", "Digite o nome de uma carta para adicionar.");
       return;
     }
     if (isAtLimit) {
-      toast.error("Limite de cartas atingido — faça upgrade do seu plano", {
-        action: { label: "Ver planos", onClick: () => { onOpenChange(false); navigate("/pricing"); } },
+      modal.action({
+        type: "warning",
+        title: "Limite de cartas atingido",
+        message: `Seu plano suporta até ${planLimit} cartas. Faça upgrade para continuar adicionando.`,
+        actionLabel: "Ver planos",
+        onAction: () => { onOpenChange(false); navigate("/pricing"); },
       });
       return;
     }
@@ -75,7 +79,7 @@ export const AddCardModal = ({ open, onOpenChange }: Props) => {
       foil,
       addedAt: new Date().toISOString(),
     });
-    toast.success(`${search} adicionada à coleção!`);
+    modal.success(`${search} adicionada!`, "A carta foi incluída na sua coleção.");
     setSearch("");
     setQty(1);
     setFoil(false);

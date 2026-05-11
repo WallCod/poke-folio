@@ -9,6 +9,10 @@ import mongoose from 'mongoose';
 dotenv.config();
 
 import authRouter from './routes/auth';
+import cardsRouter from './routes/cards';
+import portfoliosRouter from './routes/portfolios';
+import marketRouter from './routes/market';
+import { scheduleDailyPriceSnapshot } from './jobs/dailyPriceSnapshot';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -23,8 +27,14 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(cookieParser());
 
+// ─── Arquivos estáticos ───────────────────────────────────────────────────────
+app.use('/static', express.static('public'));
+
 // ─── Rotas ────────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRouter);
+app.use('/api/cards', cardsRouter);
+app.use('/api/portfolios', portfoliosRouter);
+app.use('/api/market', marketRouter);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected', timestamp: new Date().toISOString() });
@@ -49,6 +59,8 @@ async function bootstrap() {
   app.listen(PORT, () => {
     console.log(`[Server] Backend rodando em http://localhost:${PORT}`);
   });
+
+  scheduleDailyPriceSnapshot();
 }
 
 bootstrap();

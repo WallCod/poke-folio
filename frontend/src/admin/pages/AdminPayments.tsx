@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { DollarSign, Clock, AlertTriangle, TrendingDown, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { modal } from "@/store/useAppModal";
 import {
   getPayments,
   getUsers,
@@ -73,14 +73,14 @@ const AdminPayments = () => {
     updatePayment(p.id, { status: "paid" });
     updateUser(p.userId, { planStatus: "active" });
     reload();
-    toast.success("Pagamento marcado como pago");
+    modal.success("Pagamento confirmado", "O pagamento foi marcado como pago com sucesso.");
   };
 
   const handleCancel = (p: StoredPayment) => {
     updatePayment(p.id, { status: "cancelled" });
     updateUser(p.userId, { plan: "free", planStatus: "active" });
     reload();
-    toast.success("Plano cancelado — usuário rebaixado para Free");
+    modal.warning("Plano cancelado", "O usuário foi rebaixado para o plano gratuito.");
   };
 
   return (

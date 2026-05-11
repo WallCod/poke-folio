@@ -56,12 +56,94 @@ export interface AuthResponse {
   };
 }
 
+export interface TcgSearchResult {
+  tcgId: string;
+  name: string;
+  setName: string;
+  setCode: string;
+  number: string;
+  rarity: string;
+  types: string[];
+  artist: string;
+  imageUrl: string;
+  imageUrlHiRes: string;
+  marketPriceUsd: number | null;
+  marketPriceBrl: number | null;
+  marketPriceBrlMin: number | null;
+  marketPriceBrlMax: number | null;
+  priceSource: string;
+  supertype: string;
+  subtypes: string[];
+  hp: string;
+  lang?: string;          // 'EN' | 'JP' | 'POCKET' | 'PT'
+  // Campos extras do MYP (presentes quando priceSource === 'mypcards')
+  mypAvg?: number | null;
+  mypTcgPriceUsd?: number | null;
+  mypAvailableQty?: number | null;
+  mypLink?: string | null;
+  editionPt?: string | null;
+  editionEn?: string | null;
+}
+
+export interface PricePoint {
+  priceBrl: number;
+  priceUsd: number | null;
+  source: string;
+  recordedAt: string;
+}
+
+export const cardApi = {
+  search: (q: string, page = 1, pageSize = 48) =>
+    api.get<{ cards: TcgSearchResult[]; totalCount: number; page: number; pageSize: number }>(
+      `/cards/search`, { params: { q, page, pageSize } }
+    ),
+
+  getCard: (tcgId: string) =>
+    api.get<{ card: TcgSearchResult; prices: { usd: number | null; brl: number | null }; fresh: boolean }>(
+      `/cards/${tcgId}`
+    ),
+
+  priceHistory: (tcgId: string, days = 90) =>
+    api.get<PricePoint[]>(`/cards/${tcgId}/price-history`, { params: { days } }),
+
+  refreshPrices: () =>
+    api.post<{ updated: number; total: number }>('/cards/refresh-prices'),
+};
+
+export interface MarketCard {
+  tcgId: string;
+  name: string;
+  setName: string;
+  setCode: string;
+  rarity: string;
+  imageUrl: string;
+  imageUrlHiRes?: string;
+  marketPriceBrl: number | null;
+  marketPriceUsd: number | null;
+  types: string[];
+  totalQty?: number;
+  holders?: number;
+}
+
+export interface MarketTop {
+  topValued: MarketCard[];
+  popular: MarketCard[];
+  recent: MarketCard[];
+}
+
+export const marketApi = {
+  top: () => api.get<MarketTop>('/market/top'),
+};
+
 export const authApi = {
   register: (data: { name: string; email: string; password: string }) =>
-    api.post<AuthResponse>('/auth/register', data),
+    api.post<{ message: string }>('/auth/register', data),
 
   login: (data: { email: string; password: string }) =>
     api.post<AuthResponse>('/auth/login', data),
+
+  verifyEmail: (token: string) =>
+    api.get<AuthResponse>(`/auth/verify-email/${token}`),
 
   me: () => api.get('/auth/me'),
 };

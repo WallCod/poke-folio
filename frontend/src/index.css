@@ -103,13 +103,14 @@
   }
 
   html {
-    /* dark-first: ensure scrollbar styles match */
     color-scheme: dark;
+    scroll-behavior: smooth;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+    overflow-y: scroll; /* evita layout shift ao abrir modais */
     background-image:
       radial-gradient(ellipse 80% 50% at 50% -10%, hsl(48 100% 50% / 0.06), transparent),
       radial-gradient(ellipse 60% 40% at 100% 100%, hsl(211 73% 59% / 0.05), transparent);
@@ -244,4 +245,25 @@
     border-radius: 4px;
   }
   .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+}
+
+/* ── Scrollbar global estilizada (tema escuro) ───────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(240 10% 30%);
+}
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
 }

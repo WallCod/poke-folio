@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { getSession } from "@/lib/auth";
 
 export type Rarity =
   | "common"
@@ -57,8 +58,13 @@ interface UserState {
   memberSince: string;
 }
 
-export const useUser = create<UserState>(() => ({
-  name: "Treinador",
-  email: "treinador@pokefolio.app",
-  memberSince: "2024",
-}));
+function sessionToUser(): UserState {
+  const s = getSession();
+  return {
+    name: s?.name ?? "Treinador",
+    email: s?.email ?? "",
+    memberSince: new Date().getFullYear().toString(),
+  };
+}
+
+export const useUser = create<UserState>(() => sessionToUser());

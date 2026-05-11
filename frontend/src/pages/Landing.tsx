@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Logo } from "@/components/Logo";
+import { AvatarMenu } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,13 +10,13 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
-import { Sparkles, Shield, TrendingUp, ArrowRight, Check, Zap, Crown, Loader2 } from "lucide-react";
+import { Sparkles, Shield, TrendingUp, ArrowRight, Check, Zap, Crown, Loader2, Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
 import heroImage from "@/assets/hero-cards.jpg";
-import { mockLogin, setSessionFromApi } from "@/lib/auth";
+import { mockLogin, setSessionFromApi, getSession, clearSession } from "@/lib/auth";
 import { authApi } from "@/lib/api";
-import { toast } from "sonner";
+import api from "@/lib/api";
+import { modal } from "@/store/useAppModal";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -72,47 +73,151 @@ const PLANS = [
   },
 ];
 
+// Pokébola dourada decorativa — reutilizada no modal
+const GoldPokeball = () => (
+  <svg viewBox="0 0 72 72" width="56" height="56" aria-hidden="true" className="mx-auto mb-4">
+    <defs>
+      <linearGradient id="gpb-modal-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#f5c842" />
+        <stop offset="100%" stopColor="#e8a020" />
+      </linearGradient>
+    </defs>
+    <circle cx="36" cy="36" r="34" fill="none" stroke="url(#gpb-modal-gold)" strokeWidth="2.5" />
+    <path d="M 2,36 A 34,34 0 0 1 70,36 Z" fill="url(#gpb-modal-gold)" opacity="0.9" />
+    <path d="M 2,36 A 34,34 0 0 0 70,36 Z" fill="#1a1a2e" />
+    <rect x="2" y="33" width="68" height="6" fill="#0f0f1a" />
+    <circle cx="36" cy="36" r="10" fill="#0f0f1a" stroke="url(#gpb-modal-gold)" strokeWidth="2" />
+    <circle cx="36" cy="36" r="6.5" fill="#16161f" stroke="url(#gpb-modal-gold)" strokeWidth="1.5" />
+    <circle cx="32" cy="32" r="2.5" fill="#f5c842" opacity="0.35" />
+  </svg>
+);
+
+type ModalView = "login" | "signup" | "forgot" | "forgot-sent" | "reset" | null;
+
 const Landing = () => {
-  const [open, setOpen] = useState<"login" | "signup" | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [session, setSession] = useState(getSession);
+
+  // Checa reset token na URL antes de qualquer outro estado
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlResetToken = urlParams.get("reset");
+
+  const [open, setOpen] = useState<ModalView>(() => {
+    if (urlResetToken) return "reset";
+    // Abre modal se redirecionado da página de Planos
+    const nav = location.state as { openModal?: string } | null;
+    if (nav?.openModal === "login") return "login";
+    if (nav?.openModal === "signup") return "signup";
+    return null;
+  });
+  const [resetToken, setResetToken] = useState(urlResetToken ?? "");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+
+  // Limpa o token da URL sem recarregar
+  if (urlResetToken) {
+    window.history.replaceState({}, "", window.location.pathname);
+  }
+
+  const resetFields = () => {
+    setName(""); setEmail(""); setPassword("");
+    setNewPassword(""); setConfirmPassword(""); setResetToken("");
+    setShowPassword(false);
+  };
+
+  const openModal = (view: ModalView) => { resetFields(); setOpen(view); };
+  const closeModal = () => { resetFields(); setOpen(null); };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      toast.error("Preencha email e senha");
+      modal.error("Campos obrigatórios", "Preencha email e senha para continuar.");
       return;
     }
-
     setLoading(true);
     try {
       if (open === "signup") {
-        if (!name.trim()) { toast.error("Informe seu nome"); setLoading(false); return; }
-        const { data } = await authApi.register({ name, email, password });
-        const session = setSessionFromApi(data);
-        toast.success(`Bem-vindo, ${session.name}! Confira seu email. 🎴`);
-        navigate("/dashboard");
+        if (!name.trim()) {
+          modal.error("Nome obrigatório", "Informe seu nome para criar a conta.");
+          setLoading(false);
+          return;
+        }
+        await authApi.register({ name, email, password });
+        closeModal();
+        navigate("/verify-email");
       } else {
         const { data } = await authApi.login({ email, password });
-        const session = setSessionFromApi(data);
-        toast.success(`Bem-vindo de volta, ${session.name}!`);
-        navigate(session.role === "admin" ? "/admin/dashboard" : "/dashboard");
+        const s = setSessionFromApi(data);
+        setSession(s);
+        closeModal();
+        modal.success(`Bem-vindo de volta, ${s.name}!`);
       }
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
         "Erro ao conectar com o servidor";
-      // Fallback para mock em dev se o backend não estiver rodando
       if (msg === "Erro ao conectar com o servidor" && import.meta.env.DEV) {
-        const session = mockLogin(email);
-        toast.success(`[dev] ${session.name} — backend offline, usando mock`);
-        navigate(session.role === "admin" ? "/admin/dashboard" : "/dashboard");
+        const s = mockLogin(email);
+        setSession(s);
+        closeModal();
+        modal.success(`[dev] ${s.name}`, "Backend offline — usando mock.");
       } else {
-        toast.error(msg);
+        modal.error("Falha no acesso", msg);
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      modal.error("Campo obrigatório", "Informe seu email.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.post("/auth/forgot-password", { email });
+      setOpen("forgot-sent");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? "Não foi possível enviar o email.";
+      modal.error("Erro", msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || !confirmPassword) {
+      modal.error("Campos obrigatórios", "Preencha todos os campos.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      modal.error("Senha fraca", "A senha deve ter ao menos 6 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      modal.error("Senhas diferentes", "As senhas digitadas não coincidem.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.post("/auth/reset-password", { token: resetToken, password: newPassword });
+      setOpen("login");
+      resetFields();
+      modal.success("Senha redefinida!", "Faça login com sua nova senha.");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? "Não foi possível redefinir a senha.";
+      modal.error("Erro", msg);
     } finally {
       setLoading(false);
     }
@@ -145,20 +250,61 @@ const Landing = () => {
       {/* Header */}
       <header className="container py-6 flex items-center justify-between">
         <Logo />
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            onClick={() => setOpen("login")}
-            className="text-foreground hover:bg-surface-elevated"
+
+        {/* Nav central */}
+        <nav className="hidden sm:flex items-center gap-1">
+          <Link
+            to="/guia-tcg"
+            className="px-3.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
           >
-            Entrar
-          </Button>
-          <Button
-            onClick={() => setOpen("signup")}
-            className="bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold transition-all"
+            Guia TCG
+          </Link>
+          <Link
+            to="/sobre"
+            className="px-3.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
           >
-            Criar conta
-          </Button>
+            Sobre
+          </Link>
+          <Link
+            to="/pricing"
+            className="px-3.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors flex items-center gap-1.5"
+          >
+            <Crown className="h-3.5 w-3.5 text-primary" />
+            Planos
+          </Link>
+        </nav>
+
+        <div className="flex items-center gap-3">
+          {session ? (
+            <>
+              <span className="text-sm text-muted-foreground hidden sm:block">
+                Olá, <strong className="text-foreground">{session.name}</strong>
+              </span>
+              <AvatarMenu
+                displayName={session.name}
+                isAdmin={session.role === "admin"}
+                size="lg"
+                onNavigate={navigate}
+                onLogout={() => { clearSession(); setSession(null); }}
+              />
+            </>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => setOpen("login")}
+                className="text-foreground hover:bg-surface-elevated"
+              >
+                Entrar
+              </Button>
+              <Button
+                onClick={() => setOpen("signup")}
+                className="bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold transition-all"
+              >
+                Criar conta
+              </Button>
+            </>
+          )}
         </div>
       </header>
 
@@ -184,22 +330,42 @@ const Landing = () => {
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
-            <Button
-              size="lg"
-              onClick={() => setOpen("signup")}
-              className="bg-gradient-gold text-background font-semibold text-base px-7 hover:opacity-90 hover:shadow-glow-gold transition-all animate-pulse-gold"
-            >
-              Criar minha coleção
-              <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => setOpen("login")}
-              className="border-border/70 bg-card/50 backdrop-blur hover:bg-surface-elevated text-base px-7"
-            >
-              Já tenho conta
-            </Button>
+            {session ? (
+              <>
+                <Link
+                  to="/dashboard"
+                  className="inline-flex items-center gap-2 bg-gradient-gold text-background font-semibold text-base px-7 py-2.5 rounded-lg hover:opacity-90 hover:shadow-glow-gold transition-all animate-pulse-gold"
+                >
+                  Meu portfolio
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  to="/catalog"
+                  className="inline-flex items-center gap-2 border border-border/70 bg-card/50 backdrop-blur hover:bg-surface-elevated text-base px-7 py-2.5 rounded-lg transition-colors"
+                >
+                  Explorar catálogo
+                </Link>
+              </>
+            ) : (
+              <>
+                <Button
+                  size="lg"
+                  onClick={() => setOpen("signup")}
+                  className="bg-gradient-gold text-background font-semibold text-base px-7 hover:opacity-90 hover:shadow-glow-gold transition-all animate-pulse-gold"
+                >
+                  Criar minha coleção
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => setOpen("login")}
+                  className="border-border/70 bg-card/50 backdrop-blur hover:bg-surface-elevated text-base px-7"
+                >
+                  Já tenho conta
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Social proof */}
@@ -353,7 +519,7 @@ const Landing = () => {
 
                   <Button
                     size="sm"
-                    onClick={() => setOpen("signup")}
+                    onClick={() => session ? navigate("/dashboard") : setOpen("signup")}
                     className={cn(
                       "w-full text-xs font-semibold",
                       plan.highlight
@@ -361,7 +527,7 @@ const Landing = () => {
                         : "bg-surface-elevated border border-border/60 text-foreground hover:bg-card"
                     )}
                   >
-                    {plan.cta}
+                    {session ? "Ir para o portfolio" : plan.cta}
                   </Button>
                 </div>
               );
@@ -383,85 +549,228 @@ const Landing = () => {
         <p>Não afiliado a The Pokémon Company.</p>
       </footer>
 
-      {/* Auth modal */}
-      <Dialog open={open !== null} onOpenChange={(v) => !v && setOpen(null)}>
+      {/* Modal unificado — login / signup / forgot / reset */}
+      <Dialog open={open !== null} onOpenChange={(v) => { if (!v) closeModal(); }}>
         <DialogContent className="bg-card border-border/70 max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-display text-2xl">
-              {open === "signup" ? "Criar sua conta" : "Bem-vindo de volta"}
-            </DialogTitle>
-            <DialogDescription>
-              {open === "signup"
-                ? "Comece a gerenciar sua coleção em segundos."
-                : "Acesse sua coleção pessoal."}
-            </DialogDescription>
-          </DialogHeader>
 
-          <form className="space-y-4 pt-2" onSubmit={handleAuth}>
-            {open === "signup" && (
-              <div className="space-y-2">
-                <Label htmlFor="name">Nome</Label>
-                <Input
-                  id="name"
-                  placeholder="Como devemos te chamar?"
-                  className="surface-elevated border-border/70"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  autoFocus
-                />
+          {/* ── LOGIN & SIGNUP ── */}
+          {(open === "login" || open === "signup") && (
+            <>
+              <DialogHeader className="items-center text-center space-y-0 pb-0">
+                <GoldPokeball />
+                <DialogTitle className="font-display text-2xl text-center">
+                  {open === "signup" ? "Criar sua conta" : "Bem-vindo de volta"}
+                </DialogTitle>
+              </DialogHeader>
+              <form className="space-y-4 pt-4" onSubmit={handleAuth}>
+                {open === "signup" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Nome</Label>
+                    <Input
+                      id="name"
+                      placeholder="Como devemos te chamar?"
+                      className="surface-elevated border-border/70"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="treinador@email.com"
+                    className="surface-elevated border-border/70"
+                    autoFocus={open === "login"}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Senha</Label>
+                    {open === "login" && (
+                      <button
+                        type="button"
+                        onClick={() => { setPassword(""); setShowPassword(false); setOpen("forgot"); }}
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Esqueceu a senha?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="surface-elevated border-border/70 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold disabled:opacity-60"
+                >
+                  {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Aguarde...</> : (open === "signup" ? "Criar conta" : "Entrar")}
+                </Button>
+                <p className="text-center text-xs text-muted-foreground pt-1">
+                  {open === "signup" ? "Já tem conta?" : "Novo por aqui?"}{" "}
+                  <button
+                    type="button"
+                    onClick={() => { setPassword(""); setShowPassword(false); setOpen(open === "signup" ? "login" : "signup"); }}
+                    className="text-primary hover:underline font-medium"
+                  >
+                    {open === "signup" ? "Entrar" : "Criar conta"}
+                  </button>
+                </p>
+              </form>
+            </>
+          )}
+
+          {/* ── FORGOT PASSWORD ── */}
+          {open === "forgot" && (
+            <>
+              <DialogHeader className="items-center text-center space-y-0 pb-0">
+                <GoldPokeball />
+                <DialogTitle className="font-display text-2xl text-center">Esqueceu a senha?</DialogTitle>
+              </DialogHeader>
+              <p className="text-center text-sm text-muted-foreground -mt-1">
+                Informe seu email e enviaremos um link para redefinir sua senha.
+              </p>
+              <form className="space-y-4" onSubmit={handleForgot}>
+                <div className="space-y-2">
+                  <Label htmlFor="forgot-email">Email</Label>
+                  <Input
+                    id="forgot-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="treinador@email.com"
+                    className="surface-elevated border-border/70"
+                    autoFocus
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold disabled:opacity-60"
+                >
+                  {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Enviando...</> : "Enviar link de redefinição"}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => { setEmail(""); setOpen("login"); }}
+                  className="block w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors pt-1"
+                >
+                  ← Voltar para o login
+                </button>
+              </form>
+            </>
+          )}
+
+          {/* ── FORGOT SENT ── */}
+          {open === "forgot-sent" && (
+            <div className="flex flex-col items-center text-center gap-5 py-2">
+              <GoldPokeball />
+              <div className="h-14 w-14 -mt-2 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
+                <CheckCircle2 className="h-6 w-6 text-primary" />
               </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="treinador@email.com"
-                className="surface-elevated border-border/70"
-                autoFocus={open === "login"}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="surface-elevated border-border/70"
-              />
-            </div>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold disabled:opacity-60"
-            >
-              {loading ? (
-                <><Loader2 className="h-4 w-4 animate-spin" /> Aguarde...</>
-              ) : (
-                open === "signup" ? "Criar conta" : "Entrar"
-              )}
-            </Button>
-            <p className="text-center text-xs text-muted-foreground pt-1">
-              {open === "signup" ? "Já tem conta?" : "Novo por aqui?"}{" "}
+              <DialogTitle className="font-display text-2xl">Verifique seu email</DialogTitle>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Se o email <span className="text-foreground font-medium">{email}</span> estiver
+                cadastrado, você receberá as instruções em breve.
+                <br /><br />
+                Não recebeu? Verifique o spam ou aguarde alguns minutos.
+              </p>
               <button
                 type="button"
-                onClick={() => { setOpen(open === "signup" ? "login" : "signup"); setPassword(""); }}
-                className="text-primary hover:underline font-medium"
+                onClick={() => closeModal()}
+                className="px-6 py-2 rounded-lg border border-border/70 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
               >
-                {open === "signup" ? "Entrar" : "Criar conta"}
+                Fechar
               </button>
-            </p>
-            <Link
-              to="/dashboard"
-              className="block text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Continuar como visitante →
-            </Link>
-          </form>
+            </div>
+          )}
+
+          {/* ── RESET PASSWORD ── */}
+          {open === "reset" && (
+            <>
+              <DialogHeader className="items-center text-center space-y-0 pb-0">
+                <GoldPokeball />
+                <DialogTitle className="font-display text-2xl text-center">Nova senha</DialogTitle>
+              </DialogHeader>
+              <p className="text-center text-sm text-muted-foreground -mt-1">
+                Digite e confirme sua nova senha.
+              </p>
+              <form className="space-y-4" onSubmit={handleReset}>
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">Nova senha</Label>
+                  <div className="relative">
+                    <Input
+                      id="new-password"
+                      type={showPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                      className="surface-elevated border-border/70 pr-10"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirmar nova senha</Label>
+                  <div className="relative">
+                    <Input
+                      id="confirm-password"
+                      type={showPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Repita a senha"
+                      className="surface-elevated border-border/70 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold disabled:opacity-60"
+                >
+                  {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Salvando...</> : "Salvar nova senha"}
+                </Button>
+              </form>
+            </>
+          )}
+
         </DialogContent>
       </Dialog>
     </div>
