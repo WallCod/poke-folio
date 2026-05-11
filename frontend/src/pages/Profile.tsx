@@ -42,6 +42,8 @@ import {
   KeyRound,
   Eye,
   EyeOff,
+  Camera,
+  X,
 } from "lucide-react";
 
 const rarityWeight: Record<string, number> = {
@@ -120,7 +122,7 @@ const Profile = () => {
   const [showNewPwd, setShowNewPwd] = useState(false);
   const [changePwdLoading, setChangePwdLoading] = useState(false);
 
-  // Avatar color — salvo em localStorage
+  // Avatar
   const AVATAR_COLORS = [
     "from-yellow-400 to-orange-500",
     "from-purple-500 to-pink-500",
@@ -132,9 +134,77 @@ const Profile = () => {
   const [avatarColor, setAvatarColor] = useState(() => {
     return localStorage.getItem("pokefolio.avatarColor") ?? "from-yellow-400 to-orange-500";
   });
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    import('@/lib/api').then(({ default: api }) => {
+      api.get('/auth/me').then(({ data }) => {
+        if (data.avatarUrl) setAvatarUrl(data.avatarUrl);
+      }).catch(() => {});
+    });
+  }, []);
+
   const handleAvatarColor = (color: string) => {
     setAvatarColor(color);
     localStorage.setItem("pokefolio.avatarColor", color);
+  };
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      modal.error("Formato inválido", "Selecione uma imagem (JPG, PNG, WebP).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const raw = ev.target?.result as string;
+      // Redimensiona para 200x200 via canvas
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 200; canvas.height = 200;
+        const ctx = canvas.getContext("2d")!;
+        // Crop quadrado centralizado
+        const size = Math.min(img.width, img.height);
+        const sx = (img.width - size) / 2;
+        const sy = (img.height - size) / 2;
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, 200, 200);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+        if (dataUrl.length > 300_000) {
+          modal.error("Imagem muito grande", "Escolha uma imagem menor.");
+          return;
+        }
+        setAvatarUploading(true);
+        try {
+          const { default: api } = await import('@/lib/api');
+          await api.patch('/auth/me', { avatarUrl: dataUrl });
+          setAvatarUrl(dataUrl);
+        } catch {
+          modal.error("Erro", "Não foi possível salvar o avatar.");
+        } finally {
+          setAvatarUploading(false);
+        }
+      };
+      img.src = raw;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleRemoveAvatar = async () => {
+    setAvatarUploading(true);
+    try {
+      const { default: api } = await import('@/lib/api');
+      await api.patch('/auth/me', { avatarUrl: null });
+      setAvatarUrl(null);
+    } catch {
+      modal.error("Erro", "Não foi possível remover o avatar.");
+    } finally {
+      setAvatarUploading(false);
+    }
   };
 
   // Set stats
@@ -341,22 +411,67 @@ const Profile = () => {
       <div className="glass-panel p-6 md:p-8">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
           <div className="relative shrink-0 group/avatar">
-            <div className={cn("h-24 w-24 md:h-28 md:w-28 rounded-2xl bg-gradient-to-br flex items-center justify-center shadow-lg", avatarColor)}>
-              <span className="font-display text-5xl font-bold text-white select-none">
-                {displayName.charAt(0).toUpperCase()}
-              </span>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarUpload}
+            />
+            {/* Avatar: foto ou inicial */}
+            <div
+              className={cn(
+                "h-24 w-24 md:h-28 md:w-28 rounded-2xl flex items-center justify-center shadow-lg overflow-hidden cursor-pointer",
+                avatarUrl ? "bg-card border border-border/50" : cn("bg-gradient-to-br", avatarColor)
+              )}
+              onClick={() => !avatarUploading && avatarInputRef.current?.click()}
+              title="Clique para alterar foto"
+            >
+              {avatarUploading ? (
+                <div className="w-full h-full flex items-center justify-center bg-black/40">
+                  <div className="h-6 w-6 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                </div>
+              ) : avatarUrl ? (
+                <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
+              ) : (
+                <span className="font-display text-5xl font-bold text-white select-none">
+                  {displayName.charAt(0).toUpperCase()}
+                </span>
+              )}
             </div>
-            {/* Selector de cor do avatar */}
-            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 hidden group-hover/avatar:flex items-center gap-1 bg-card border border-border/70 rounded-full px-2 py-1 shadow-lg z-10">
-              {AVATAR_COLORS.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => handleAvatarColor(c)}
-                  className={cn("h-5 w-5 rounded-full bg-gradient-to-br border-2 transition-transform hover:scale-110", c,
-                    avatarColor === c ? "border-white scale-110" : "border-transparent")}
-                />
-              ))}
+
+            {/* Overlay de câmera no hover */}
+            <div
+              className="absolute inset-0 rounded-2xl bg-black/50 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity cursor-pointer pointer-events-none"
+            >
+              <Camera className="h-7 w-7 text-white" />
             </div>
+
+            {/* Botão remover foto */}
+            {avatarUrl && !avatarUploading && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleRemoveAvatar(); }}
+                className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive border-2 border-background flex items-center justify-center z-10 hover:bg-destructive/80 transition-colors"
+                title="Remover foto"
+              >
+                <X className="h-3 w-3 text-white" />
+              </button>
+            )}
+
+            {/* Selector de cor do avatar — só quando não tem foto */}
+            {!avatarUrl && (
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 hidden group-hover/avatar:flex items-center gap-1 bg-card border border-border/70 rounded-full px-2 py-1 shadow-lg z-10">
+                {AVATAR_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => handleAvatarColor(c)}
+                    className={cn("h-5 w-5 rounded-full bg-gradient-to-br border-2 transition-transform hover:scale-110", c,
+                      avatarColor === c ? "border-white scale-110" : "border-transparent")}
+                  />
+                ))}
+              </div>
+            )}
+
             {isAdmin && (
               <div className="absolute -bottom-2 -right-2 h-7 w-7 rounded-lg bg-[hsl(28_85%_44%)] flex items-center justify-center shadow-lg border border-background">
                 <Shield className="h-3.5 w-3.5 text-white" />

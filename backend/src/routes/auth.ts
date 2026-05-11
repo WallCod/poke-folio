@@ -303,6 +303,7 @@ router.get('/me', async (req: Request, res: Response): Promise<void> => {
       planStatus: user.planStatus,
       planExpiry: user.planExpiry,
       cards: user.cards,
+      avatarUrl: user.avatarUrl ?? null,
       createdAt: user.createdAt,
     });
   } catch {
@@ -364,24 +365,38 @@ router.patch('/me', async (req: Request, res: Response): Promise<void> => {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET!) as { id: string };
-    const { name } = req.body as { name?: string };
+    const { name, avatarUrl } = req.body as { name?: string; avatarUrl?: string };
 
-    if (!name || name.trim().length < 2 || name.trim().length > 80) {
-      res.status(422).json({ error: 'Nome deve ter entre 2 e 80 caracteres.' });
+    const update: Record<string, unknown> = {};
+
+    if (name !== undefined) {
+      if (!name || name.trim().length < 2 || name.trim().length > 80) {
+        res.status(422).json({ error: 'Nome deve ter entre 2 e 80 caracteres.' });
+        return;
+      }
+      update.name = name.trim();
+    }
+
+    if (avatarUrl !== undefined) {
+      if (avatarUrl !== null && typeof avatarUrl === 'string' && avatarUrl.length > 300_000) {
+        res.status(422).json({ error: 'Avatar muito grande.' });
+        return;
+      }
+      update.avatarUrl = avatarUrl ?? null;
+    }
+
+    if (Object.keys(update).length === 0) {
+      res.status(422).json({ error: 'Nada para atualizar.' });
       return;
     }
 
-    const user = await User.findByIdAndUpdate(
-      payload.id,
-      { name: name.trim() },
-      { new: true }
-    );
+    const user = await User.findByIdAndUpdate(payload.id, update, { new: true });
     if (!user) {
       res.status(404).json({ error: 'Usuário não encontrado' });
       return;
     }
 
-    res.json({ name: user.name });
+    res.json({ name: user.name, avatarUrl: user.avatarUrl ?? null });
   } catch {
     res.status(401).json({ error: 'Token inválido' });
   }

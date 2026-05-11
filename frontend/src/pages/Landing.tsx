@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PublicHeader } from "@/components/PublicHeader";
+import { PublicFooter } from "@/components/PublicFooter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -473,21 +474,18 @@ const Landing = () => {
     : [];
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden">
+    <div className="min-h-screen flex flex-col relative">
 
-      {/* ── Background global ── */}
-      <div className="absolute inset-0 -z-10">
+      {/* ── Background global — sem overflow-hidden para não quebrar sticky ── */}
+      <div className="fixed inset-0 -z-10 pointer-events-none">
         <img src={heroImage} alt="" className="h-full w-full object-cover opacity-35" />
         <div className="absolute inset-0 bg-gradient-to-b from-background/65 via-background/88 to-background" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsl(48_100%_50%/0.12),transparent_55%)]" />
       </div>
 
       {/* Pokébolas decorativas */}
-      <PokeballDecor className="absolute -right-32 -top-32 w-[500px] text-primary opacity-[0.04] pointer-events-none" />
-      <PokeballDecor className="absolute -left-20 bottom-40 w-[300px] text-primary opacity-[0.03] pointer-events-none" />
-      <CardDecor className="absolute right-[8%] top-[22%] w-16 text-primary opacity-[0.12] rotate-12 pointer-events-none hidden lg:block" />
-      <CardDecor className="absolute right-[14%] top-[30%] w-10 text-primary opacity-[0.08] -rotate-6 pointer-events-none hidden lg:block" />
-      <CardDecor className="absolute left-[6%] top-[35%] w-12 text-primary opacity-[0.07] rotate-[-15deg] pointer-events-none hidden lg:block" />
+      <PokeballDecor className="fixed right-0 top-0 w-[500px] text-primary opacity-[0.03] pointer-events-none -z-10 hidden lg:block" />
+      <PokeballDecor className="fixed left-0 bottom-40 w-[300px] text-primary opacity-[0.02] pointer-events-none -z-10 hidden lg:block" />
 
       <PublicHeader
         onLoginClick={() => setOpen("login")}
@@ -809,15 +807,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ── Footer com linha de tipos ── */}
-      <footer className="container py-6 border-t border-border/50 text-xs text-muted-foreground flex flex-col sm:flex-row items-center justify-between gap-2 relative">
-        {/* Linha de cores dos tipos no topo do footer */}
-        <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
-          style={{ background: "linear-gradient(90deg, #FF6A00, #1B87E6, #3DAD4C, #DAA800, #E8579A, #C03028, #4A4878, #8BA6BB, #5060C0, #DA6FC8, #A0A0B8)" }}
-        />
-        <p>© {new Date().getFullYear()} Pokéfolio. Feito por colecionadores.</p>
-        <p>Não afiliado a The Pokémon Company.</p>
-      </footer>
+      <PublicFooter />
 
       {/* ── Modal auth ── */}
       <Dialog open={open !== null} onOpenChange={(v) => { if (!v) closeModal(); }}>

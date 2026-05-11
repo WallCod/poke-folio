@@ -7,6 +7,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { BackToTop } from "@/components/BackToTop";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { AppModal } from "@/components/AppModal";
+import { useRef } from "react";
 import Landing from "./pages/Landing.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import Collection from "./pages/Collection.tsx";
@@ -37,6 +38,21 @@ const ConditionalBackToTop = () => {
   return <BackToTop />;
 };
 
+const PageTransition = ({ children }: { children: React.ReactNode }) => {
+  const { pathname } = useLocation();
+  const key = useRef(0);
+  const prev = useRef(pathname);
+  if (prev.current !== pathname) {
+    key.current += 1;
+    prev.current = pathname;
+  }
+  return (
+    <div key={key.current} className="animate-fade-in contents">
+      {children}
+    </div>
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -45,6 +61,7 @@ const App = () => (
       <AppModal />
       <BrowserRouter>
         <ScrollToTop />
+        <PageTransition>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
@@ -75,6 +92,7 @@ const App = () => (
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </PageTransition>
         <ConditionalBackToTop />
       </BrowserRouter>
     </TooltipProvider>

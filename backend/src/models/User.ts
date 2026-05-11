@@ -19,6 +19,7 @@ export interface IUser extends Document {
   emailVerificationExpires: Date | null;
   passwordResetToken: string | null;
   passwordResetExpires: Date | null;
+  avatarUrl: string | null;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidate: string): Promise<boolean>;
@@ -88,6 +89,10 @@ const UserSchema = new Schema<IUser>(
     },
     passwordResetExpires: {
       type: Date,
+      default: null,
+    },
+    avatarUrl: {
+      type: String,
       default: null,
     },
   },

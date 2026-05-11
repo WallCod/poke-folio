@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { getSession } from "@/lib/auth";
 import { getUsers } from "@/lib/storage";
 import { PublicHeader } from "@/components/PublicHeader";
+import { PublicFooter } from "@/components/PublicFooter";
 
 type Billing = "monthly" | "annual";
 
@@ -90,7 +91,7 @@ const Pricing = () => {
   const currentPlanId = storedUser?.plan ?? null;
 
   return (
-    <div className="min-h-screen flex flex-col animate-fade-in">
+    <div className="min-h-screen flex flex-col">
       <PublicHeader
         onLoginClick={() => navigate("/", { state: { openModal: "login" } })}
         onSignupClick={() => navigate("/", { state: { openModal: "signup" } })}
@@ -275,6 +276,7 @@ const Pricing = () => {
         Todos os planos incluem 7 dias de teste grátis. Cancele quando quiser.
       </p>
     </div>
+    <PublicFooter />
     </div>
   );
 };

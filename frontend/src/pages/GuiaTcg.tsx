@@ -1,4 +1,5 @@
 import { PublicHeader } from "@/components/PublicHeader";
+import { PublicFooter } from "@/components/PublicFooter";
 import { Shield, TrendingUp, Star, Layers, Zap, ArrowRight, ChevronDown, BookOpen, Sparkles, Crown } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -63,7 +64,7 @@ const GuiaTcg = () => {
   const session = getSession();
   const navigate = useNavigate();
   return (
-    <div className="min-h-screen flex flex-col animate-fade-in">
+    <div className="min-h-screen flex flex-col">
       <PublicHeader />
 
       <main className="flex-1">
@@ -178,6 +179,7 @@ const GuiaTcg = () => {
           </div>
         </section>
       </main>
+      <PublicFooter />
     </div>
   );
 };

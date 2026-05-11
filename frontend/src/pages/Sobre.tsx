@@ -1,4 +1,5 @@
 import { PublicHeader } from "@/components/PublicHeader";
+import { PublicFooter } from "@/components/PublicFooter";
 import { TrendingUp, Shield, Database, Zap, Globe, ArrowRight, BookOpen } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { getSession } from "@/lib/auth";
@@ -49,7 +50,7 @@ const Sobre = () => {
   const session = getSession();
   const navigate = useNavigate();
   return (
-    <div className="min-h-screen flex flex-col animate-fade-in">
+    <div className="min-h-screen flex flex-col">
       <PublicHeader />
 
       <main className="flex-1">
@@ -168,6 +169,7 @@ const Sobre = () => {
           </div>
         </section>
       </main>
+      <PublicFooter />
     </div>
   );
 };

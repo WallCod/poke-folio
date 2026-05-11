@@ -8,6 +8,7 @@ import api from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { modal } from "@/store/useAppModal";
 import { usePortfolios } from "@/store/usePortfolios";
+import { PublicFooter } from "@/components/PublicFooter";
 import { PublicHeader } from "@/components/PublicHeader";
 
 interface SetCard {
@@ -636,14 +637,7 @@ const SetDetail = () => {
         )}
       </div>
 
-      {/* Footer */}
-      <footer className="container py-4 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between relative mt-auto">
-        <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
-          style={{ background: "linear-gradient(90deg, #FF6A00, #1B87E6, #3DAD4C, #DAA800, #E8579A, #C03028, #4A4878, #8BA6BB, #5060C0, #DA6FC8, #A0A0B8)" }}
-        />
-        <p>© {new Date().getFullYear()} Pokéfolio.</p>
-        <p>Não afiliado a The Pokémon Company.</p>
-      </footer>
+      <PublicFooter />
 
       {/* Modal de detalhe da carta */}
       {selectedCard && (
