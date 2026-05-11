@@ -769,19 +769,8 @@ const Catalog = () => {
                             {selected.editionPt && <p className="text-xs"><span className="text-muted-foreground">PT:</span> {selected.editionPt}</p>}
                           </div>
                         )}
-                        {selected.mypLink && (
-                          <a
-                            href={selected.mypLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-center gap-2 w-full rounded-lg border border-border/60 py-2 text-xs text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors surface-elevated"
-                          >
-                            <ArrowUpRight className="h-3.5 w-3.5" />
-                            Ver no MYP Cards
-                          </a>
-                        )}
                         <p className="text-[10px] text-muted-foreground text-center">
-                          Preços em tempo real via MYP Cards · floor = menor listagem ativa
+                          Preços em tempo real · floor = menor listagem ativa
                         </p>
                       </>
                     )}

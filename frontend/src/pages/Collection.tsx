@@ -789,7 +789,7 @@ const Collection = () => {
                         <div className="py-8 text-center space-y-2 text-muted-foreground">
                           <TrendingUp className="h-9 w-9 mx-auto opacity-40" />
                           <p className="font-display font-bold text-sm">Sem dados BR</p>
-                          <p className="text-xs">Carta sem cotação no MYP Cards.</p>
+                          <p className="text-xs">Sem dados de mercado disponíveis.</p>
                         </div>
                       ) : (
                         <>
@@ -826,12 +826,6 @@ const Collection = () => {
                               {(card as any).editionPt && <p className="text-xs"><span className="text-muted-foreground">PT:</span> {(card as any).editionPt}</p>}
                             </div>
                           )}
-                          {(card as any).mypLink && (
-                            <a href={(card as any).mypLink} target="_blank" rel="noopener noreferrer"
-                              className="flex items-center justify-center gap-2 w-full rounded-lg border border-border/60 py-2 text-xs text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors surface-elevated">
-                              <ArrowUpRight className="h-3.5 w-3.5" /> Ver no MYP Cards
-                            </a>
-                          )}
                         </>
                       )}
                     </div>
@@ -859,7 +853,7 @@ const Collection = () => {
                         <div className="py-8 text-center space-y-2">
                           <BarChart2 className="h-9 w-9 mx-auto text-muted-foreground/40" />
                           <p className="font-display font-bold text-sm">Sem histórico ainda</p>
-                          <p className="text-xs text-muted-foreground">1 snapshot por dia via MYP Cards.</p>
+                          <p className="text-xs text-muted-foreground">1 snapshot por dia.</p>
                         </div>
                       ) : (
                         <>

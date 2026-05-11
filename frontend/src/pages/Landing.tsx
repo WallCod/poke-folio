@@ -10,9 +10,8 @@ import {
 } from "@/components/ui/dialog";
 import {
   Sparkles, Shield, TrendingUp, TrendingDown, ArrowRight, Check,
-  Zap, Crown, Loader2, Eye, EyeOff, CheckCircle2, Star, X, ExternalLink,
+  Zap, Crown, Loader2, Eye, EyeOff, CheckCircle2, Star, X,
 } from "lucide-react";
-import heroImage from "@/assets/hero-cards.jpg";
 import { EnergyIcon } from "@/components/EnergyIcon";
 import { mockLogin, setSessionFromApi, getSession, clearSession } from "@/lib/auth";
 import { authApi } from "@/lib/api";
@@ -121,7 +120,6 @@ function MarketModal({ card, onClose }: { card: TrendCard; onClose: () => void }
   const [imgLarge, setImgLarge] = useState(false);
   const isUp = (card.changePct ?? 0) > 0;
   const typeColor = TYPE_COLORS[card.types?.[0] ?? "Colorless"] ?? TYPE_COLORS.Colorless;
-  const mypUrl = `https://www.mypcards.com/cartas/pokemon?busca=${encodeURIComponent(card.name)}`;
 
   // Análise de mercado gerada localmente com base nos dados disponíveis
   const insight = (() => {
@@ -195,10 +193,6 @@ function MarketModal({ card, onClose }: { card: TrendCard; onClose: () => void }
             </div>
           )}
 
-          <a href={mypUrl} target="_blank" rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-primary/5 transition-colors">
-            <ExternalLink className="h-3.5 w-3.5" /> Ver no MYP Cards
-          </a>
         </div>
       </div>
 
@@ -475,17 +469,6 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen flex flex-col relative">
-
-      {/* ── Background global — sem overflow-hidden para não quebrar sticky ── */}
-      <div className="fixed inset-0 -z-10 pointer-events-none">
-        <img src={heroImage} alt="" className="h-full w-full object-cover opacity-35" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/65 via-background/88 to-background" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsl(48_100%_50%/0.12),transparent_55%)]" />
-      </div>
-
-      {/* Pokébolas decorativas */}
-      <PokeballDecor className="fixed right-0 top-0 w-[500px] text-primary opacity-[0.03] pointer-events-none -z-10 hidden lg:block" />
-      <PokeballDecor className="fixed left-0 bottom-40 w-[300px] text-primary opacity-[0.02] pointer-events-none -z-10 hidden lg:block" />
 
       <PublicHeader
         onLoginClick={() => setOpen("login")}

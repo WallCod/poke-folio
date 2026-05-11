@@ -41,7 +41,7 @@ const FAQ = [
   { q: "Posso jogar com carta graduada (PSA)?", r: "Tecnicamente sim, mas o encapsulamento dificulta o manuseio. A graduação é focada em preservação e valor de coleção, não em jogo competitivo." },
   { q: "Sets japoneses valem mais ou menos?", r: "Depende. Cartas japonesas geralmente têm tiragens menores e chegam ao mercado antes das versões EN. Certas exclusivas JP podem valer mais." },
   { q: "Como saber se um booster foi pesado (weighed)?", r: "Boosters de sets recentes têm gramatura similar entre os packs. Packs do mesmo set com peso diferente indicam que alguém verificou conteúdo antes — evite." },
-  { q: "O preço do meu portfolio é em tempo real?", r: "Sim — o PokéFolio atualiza preços via MYP Cards (mercado brasileiro) e TCGPlayer, convertendo para BRL com taxa de câmbio live." },
+  { q: "O preço do meu portfolio é em tempo real?", r: "Sim — o PokéFolio atualiza preços via mercado brasileiro e TCGPlayer, convertendo para BRL com taxa de câmbio live." },
 ];
 
 const AccordionItem = ({ q, r }: { q: string; r: string }) => {

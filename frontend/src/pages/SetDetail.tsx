@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Check, Plus, Loader2, Lock, Star, X, ExternalLink } from "lucide-react";
+import { ArrowLeft, Check, Plus, Loader2, Lock, Star, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EnergyIcon } from "@/components/EnergyIcon";
 import { getSession } from "@/lib/auth";
@@ -73,12 +73,6 @@ function rarityColor(rarity: string): string {
 }
 function rarityBadge(rarity: string): string {
   return RARITY_BADGE[rarity] ?? "bg-muted/20 border-border/40 text-muted-foreground";
-}
-
-// Link MYP correto — busca por nome da carta no marketplace
-function mypSearchUrl(name: string, number: string): string {
-  const query = encodeURIComponent(name);
-  return `https://www.mypcards.com/cartas/pokemon?busca=${query}`;
 }
 
 // ─── Card Detail Modal ────────────────────────────────────────────────────────
@@ -187,9 +181,9 @@ function CardModal({
               </div>
             )}
 
-            {/* Preços MYP */}
+            {/* Preços BRL */}
             <div className="rounded-xl border border-border/50 bg-surface-elevated/60 p-3 space-y-2">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Preço MYP Cards (BRL)</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Preço de mercado (BRL)</p>
               {pricesLoading ? (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" /> Buscando preços...
@@ -210,7 +204,7 @@ function CardModal({
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground">Preço não disponível no MYP.</p>
+                <p className="text-xs text-muted-foreground">Preço não disponível.</p>
               )}
             </div>
 
@@ -242,14 +236,6 @@ function CardModal({
                   <Lock className="h-4 w-4 mr-2" /> Entrar para marcar
                 </Button>
               )}
-              <a
-                href={mypSearchUrl(card.name, card.number)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
-              >
-                <ExternalLink className="h-3.5 w-3.5" /> Ver no MYP Cards
-              </a>
             </div>
           </div>
         </div>

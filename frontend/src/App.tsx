@@ -7,6 +7,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { BackToTop } from "@/components/BackToTop";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { AppModal } from "@/components/AppModal";
+import { GlobalBackground } from "@/components/GlobalBackground";
 import { useRef } from "react";
 import Landing from "./pages/Landing.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
@@ -59,6 +60,7 @@ const App = () => (
       <Toaster />
       <Sonner position="bottom-left" />
       <AppModal />
+      <GlobalBackground />
       <BrowserRouter>
         <ScrollToTop />
         <PageTransition>

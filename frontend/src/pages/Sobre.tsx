@@ -8,7 +8,7 @@ const FEATURES = [
   {
     icon: TrendingUp,
     titulo: "Preços em tempo real",
-    desc: "Integramos com MYP Cards (mercado brasileiro) e TCGPlayer, com conversão automática USD/EUR → BRL via taxa de câmbio live.",
+    desc: "Indexamos preços do mercado brasileiro e internacional (TCGPlayer), com conversão automática USD/EUR → BRL via taxa de câmbio live.",
   },
   {
     icon: Database,
@@ -41,7 +41,7 @@ const STACK = [
   { label: "Frontend", tech: "React 18 + TypeScript + Vite + TailwindCSS" },
   { label: "Backend", tech: "Node.js + Express + TypeScript" },
   { label: "Banco de dados", tech: "MongoDB Atlas + Mongoose" },
-  { label: "Preços TCG", tech: "pokemontcg.io + TCGdex + MYP Cards" },
+  { label: "Preços TCG", tech: "pokemontcg.io + TCGdex + mercado BR" },
   { label: "Câmbio", tech: "AwesomeAPI (USD-BRL / EUR-BRL live)" },
   { label: "Auth", tech: "JWT + bcrypt + Brevo (email)" },
 ];
@@ -75,7 +75,7 @@ const Sobre = () => {
               <h2 className="font-display text-xl font-bold">Nossa missão</h2>
               <p className="text-muted-foreground leading-relaxed">
                 O mercado de cartas Pokémon no Brasil cresceu exponencialmente nos últimos anos, mas a maioria das ferramentas disponíveis exibe preços em dólar e é voltada ao mercado norte-americano.
-                O PokéFolio existe para preencher essa lacuna — trazendo preços reais do mercado brasileiro, em Real, com dados de plataformas como MYP Cards e Liga Pokémon.
+                O PokéFolio existe para preencher essa lacuna — trazendo preços reais do mercado brasileiro, em Real, com atualização automática de câmbio.
               </p>
               <p className="text-muted-foreground leading-relaxed">
                 Seja você um colecionador casual que quer saber quanto vale aquele Charizard antigo, ou um investidor acompanhando a valorização do seu portfolio, nossa plataforma oferece as ferramentas certas.
@@ -132,10 +132,10 @@ const Sobre = () => {
                 <strong className="text-foreground">TCGdex</strong> — API complementar com sets japoneses, Pocket TCG e edições não cobertas pela pokemontcg.io. Permite buscar cartas de sets como A1, A4 e promos JP.
               </p>
               <p>
-                <strong className="text-foreground">MYP Cards</strong> — Marketplace brasileiro com preços reais de compradores e vendedores locais. Usamos seus dados como fonte primária de BRL, por refletirem o mercado nacional.
+                <strong className="text-foreground">Mercado brasileiro</strong> — Indexamos preços de compra e venda do mercado nacional para refletir o valor real das cartas em Real.
               </p>
               <p>
-                <strong className="text-foreground">AwesomeAPI</strong> — Taxa de câmbio USD-BRL e EUR-BRL em tempo real. Usada como fallback quando o MYP não tem preço para uma carta específica.
+                <strong className="text-foreground">AwesomeAPI</strong> — Taxa de câmbio USD-BRL e EUR-BRL em tempo real. Usada para converter preços internacionais quando não há cotação nacional disponível.
               </p>
             </div>
           </div>
