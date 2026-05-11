@@ -12,6 +12,7 @@ import authRouter from './routes/auth';
 import cardsRouter from './routes/cards';
 import portfoliosRouter from './routes/portfolios';
 import marketRouter from './routes/market';
+import publicRouter from './routes/public';
 import { scheduleDailyPriceSnapshot } from './jobs/dailyPriceSnapshot';
 
 const app = express();
@@ -35,6 +36,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/cards', cardsRouter);
 app.use('/api/portfolios', portfoliosRouter);
 app.use('/api/market', marketRouter);
+app.use('/api/public', publicRouter);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected', timestamp: new Date().toISOString() });
