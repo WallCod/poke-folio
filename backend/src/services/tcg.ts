@@ -361,7 +361,7 @@ async function getJpIndex(): Promise<JpCardIndex['byEnName']> {
 
   try {
     console.log('[TCGdex] Construindo índice JP…');
-    const { data } = await tcgdexClient.get('/ja/cards', { timeout: 20000 });
+    const { data } = await tcgdexClient.get('/ja/cards', { timeout: 8000 });
     const raw: Array<{ id: string; localId: string; name: string; image?: string }> = Array.isArray(data) ? data : [];
 
     // Filtra apenas sets JP que conhecemos e que têm equivalente EN
@@ -416,9 +416,11 @@ async function getJpIndex(): Promise<JpCardIndex['byEnName']> {
     jpIndex = { byEnName, loadedAt: now };
     console.log(`[TCGdex] Índice JP pronto: ${[...byEnName.values()].flat().length} cards indexados por nome EN.`);
     return byEnName;
-  } catch (err) {
-    console.warn('[TCGdex] Falha ao construir índice JP:', err);
-    return new Map();
+  } catch (err: any) {
+    console.warn('[TCGdex] Falha ao construir índice JP:', err?.message ?? err);
+    // Salva índice vazio com timestamp para não tentar de novo por 1h
+    jpIndex = { byEnName: new Map(), loadedAt: now };
+    return jpIndex.byEnName;
   }
 }
 
