@@ -8,6 +8,7 @@ import api from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { modal } from "@/store/useAppModal";
 import { usePortfolios } from "@/store/usePortfolios";
+import { PublicHeader } from "@/components/PublicHeader";
 
 interface SetCard {
   tcgId: string;
@@ -49,8 +50,34 @@ const RARITY_COLOR: Record<string, string> = {
   "Hyper Rare":                 "text-yellow-300",
 };
 
+const RARITY_BADGE: Record<string, string> = {
+  "Common":                     "bg-gray-500/15 border-gray-500/30 text-gray-300",
+  "Uncommon":                   "bg-green-500/15 border-green-500/30 text-green-300",
+  "Rare":                       "bg-blue-500/15 border-blue-500/30 text-blue-300",
+  "Rare Holo":                  "bg-blue-500/15 border-blue-500/30 text-blue-300",
+  "Rare Holo EX":               "bg-purple-500/15 border-purple-500/30 text-purple-300",
+  "Rare Holo GX":               "bg-purple-500/15 border-purple-500/30 text-purple-300",
+  "Rare Holo V":                "bg-purple-500/15 border-purple-500/30 text-purple-300",
+  "Rare Ultra":                 "bg-yellow-500/15 border-yellow-500/30 text-yellow-300",
+  "Rare Secret":                "bg-pink-500/15 border-pink-500/30 text-pink-300",
+  "Rare Rainbow":               "bg-pink-500/15 border-pink-500/30 text-pink-300",
+  "Promo":                      "bg-orange-500/15 border-orange-500/30 text-orange-300",
+  "Illustration Rare":          "bg-indigo-500/15 border-indigo-500/30 text-indigo-300",
+  "Special Illustration Rare":  "bg-pink-500/15 border-pink-500/30 text-pink-300",
+  "Hyper Rare":                 "bg-yellow-400/15 border-yellow-400/30 text-yellow-200",
+};
+
 function rarityColor(rarity: string): string {
   return RARITY_COLOR[rarity] ?? "text-muted-foreground";
+}
+function rarityBadge(rarity: string): string {
+  return RARITY_BADGE[rarity] ?? "bg-muted/20 border-border/40 text-muted-foreground";
+}
+
+// Link MYP correto — busca por nome da carta no marketplace
+function mypSearchUrl(name: string, number: string): string {
+  const query = encodeURIComponent(name);
+  return `https://www.mypcards.com/cartas/pokemon?busca=${query}`;
 }
 
 // ─── Card Detail Modal ────────────────────────────────────────────────────────
@@ -63,7 +90,6 @@ function CardModal({
   onAdd,
   onClose,
   onLoginRequired,
-  setId,
 }: {
   card: SetCard;
   owned: boolean;
@@ -72,18 +98,17 @@ function CardModal({
   onAdd: (card: SetCard) => void;
   onClose: () => void;
   onLoginRequired: () => void;
-  setId: string;
 }) {
   const [imgErr, setImgErr] = useState(false);
-  const mypLink = `https://www.mypcards.com/search?q=${encodeURIComponent(card.name)}`;
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-background/85 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
-        className="relative bg-card border border-border/70 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden"
+        className="relative bg-card border border-border/70 rounded-2xl shadow-2xl w-full overflow-hidden flex flex-col sm:flex-row"
+        style={{ maxWidth: 520 }}
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -93,87 +118,96 @@ function CardModal({
           <X className="h-4 w-4" />
         </button>
 
-        {/* Imagem */}
-        <div className="aspect-[2.5/3.5] bg-card/40 relative">
-          {card.imageUrl && !imgErr ? (
-            <img
-              src={card.imageUrl}
-              alt={card.name}
-              className="w-full h-full object-cover"
-              onError={() => setImgErr(true)}
-            />
-          ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-card/40">
-              {card.types[0] && <EnergyIcon type={card.types[0]} size={40} />}
-              <span className="text-sm text-muted-foreground">{card.name}</span>
-            </div>
-          )}
-          {owned && (
-            <div className="absolute top-2 left-2 flex items-center gap-1 bg-primary/90 text-background text-[10px] font-bold px-2 py-1 rounded-full">
-              <Check className="h-3 w-3" /> Na coleção
-            </div>
-          )}
+        {/* Imagem — coluna esquerda */}
+        <div className="sm:w-44 shrink-0 bg-card/60">
+          <div className="aspect-[2.5/3.5] relative">
+            {card.imageUrl && !imgErr ? (
+              <img
+                src={card.imageUrl}
+                alt={card.name}
+                className="w-full h-full object-contain"
+                onError={() => setImgErr(true)}
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-4">
+                {card.types[0] && <EnergyIcon type={card.types[0]} size={40} />}
+                <span className="text-xs text-muted-foreground text-center">{card.name}</span>
+              </div>
+            )}
+            {owned && (
+              <div className="absolute top-2 left-2 flex items-center gap-1 bg-primary/90 text-background text-[10px] font-bold px-2 py-1 rounded-full">
+                <Check className="h-3 w-3" /> Tenho
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Info */}
-        <div className="p-4 space-y-3">
+        {/* Info — coluna direita */}
+        <div className="flex-1 p-5 flex flex-col gap-4 min-w-0">
           <div>
-            <h3 className="font-display font-bold text-lg leading-tight">{card.name}</h3>
-            <p className="text-sm text-muted-foreground">{card.setName} · #{card.number}</p>
+            <h3 className="font-display font-bold text-xl leading-tight">{card.name}</h3>
+            <p className="text-sm text-muted-foreground mt-0.5">{card.setName} · #{card.number}</p>
           </div>
 
-          <div className="flex flex-wrap gap-2 text-xs">
+          <div className="flex flex-wrap gap-2">
             {card.rarity && (
-              <span className={cn("font-semibold", rarityColor(card.rarity))}>{card.rarity}</span>
+              <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-full border", rarityBadge(card.rarity))}>
+                {card.rarity}
+              </span>
             )}
-            {card.supertype && (
-              <span className="text-muted-foreground">{card.supertype}</span>
+            {card.supertype && card.supertype !== "Pokémon" && (
+              <span className="text-xs text-muted-foreground border border-border/50 px-2.5 py-1 rounded-full">{card.supertype}</span>
             )}
             {card.hp && (
-              <span className="text-muted-foreground">HP {card.hp}</span>
+              <span className="text-xs text-muted-foreground border border-border/50 px-2.5 py-1 rounded-full">HP {card.hp}</span>
             )}
-            {card.types.map((t) => (
-              <span key={t} className="flex items-center gap-0.5 text-muted-foreground">
-                <EnergyIcon type={t} size={12} /> {t}
-              </span>
-            ))}
           </div>
 
-          <div className="flex gap-2 pt-1">
+          {card.types.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {card.types.map((t) => (
+                <span key={t} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <EnergyIcon type={t} size={14} /> {t}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2 mt-auto pt-2">
             {loggedIn ? (
               <Button
                 className={cn(
-                  "flex-1 text-sm font-semibold",
+                  "w-full font-semibold",
                   owned
-                    ? "bg-primary/20 text-primary border border-primary/40 hover:bg-primary/30"
+                    ? "bg-primary/15 text-primary border border-primary/40 hover:bg-primary/25"
                     : "bg-gradient-gold text-background hover:opacity-90"
                 )}
                 disabled={adding || owned}
                 onClick={() => !owned && onAdd(card)}
               >
                 {adding ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Adicionando...</>
                 ) : owned ? (
-                  <><Check className="h-4 w-4 mr-1" /> Tenho essa</>
+                  <><Check className="h-4 w-4 mr-2" /> Já está na coleção</>
                 ) : (
-                  <><Plus className="h-4 w-4 mr-1" /> Adicionar à coleção</>
+                  <><Plus className="h-4 w-4 mr-2" /> Adicionar à coleção</>
                 )}
               </Button>
             ) : (
               <Button
-                className="flex-1 text-sm border border-border/60 bg-card/60 hover:bg-surface-elevated"
+                className="w-full border border-border/60 bg-card hover:bg-surface-elevated"
                 onClick={onLoginRequired}
               >
-                <Lock className="h-4 w-4 mr-1" /> Entrar para marcar
+                <Lock className="h-4 w-4 mr-2" /> Entrar para marcar
               </Button>
             )}
             <a
-              href={mypLink}
+              href={mypSearchUrl(card.name, card.number)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 px-3 py-2 rounded-md border border-border/60 text-xs text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+              className="inline-flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
             >
-              <ExternalLink className="h-3.5 w-3.5" /> MYP
+              <ExternalLink className="h-3.5 w-3.5" /> Ver no MYP Cards
             </a>
           </div>
         </div>
@@ -238,49 +272,53 @@ function CardTile({
           </div>
         )}
 
+        {/* Overlay hover */}
         {hovered && (
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center gap-2 p-2">
-            <p className="text-xs font-semibold text-center leading-tight">{card.name}</p>
-            <p className={cn("text-[10px]", rarityColor(card.rarity))}>{card.rarity}</p>
+          <div className="absolute inset-0 bg-background/90 flex flex-col items-center justify-center gap-1.5 p-2">
+            <p className="text-[11px] font-bold text-center leading-tight line-clamp-2">{card.name}</p>
+            {card.rarity && (
+              <span className={cn("text-[9px] font-semibold px-1.5 py-0.5 rounded-full border", rarityBadge(card.rarity))}>
+                {card.rarity}
+              </span>
+            )}
             {card.number && (
-              <p className="text-[10px] text-muted-foreground">#{card.number}</p>
+              <p className="text-[9px] text-muted-foreground">#{card.number}</p>
             )}
             <div className="flex flex-col gap-1 w-full mt-1">
-              <Button
-                size="sm"
-                className="h-7 text-[10px] px-2 border border-border/60 bg-card/60 hover:bg-surface-elevated"
+              {/* Botão "Ver detalhes" */}
+              <button
                 onClick={() => onOpenModal(card)}
+                className="w-full h-7 rounded-md text-[10px] font-semibold border border-border/70 bg-surface-elevated text-foreground hover:bg-card hover:border-primary/40 transition-colors"
               >
                 Ver detalhes
-              </Button>
+              </button>
+              {/* Botão de marcar */}
               {loggedIn ? (
-                <Button
-                  size="sm"
+                <button
+                  onClick={() => !owned && onAdd(card)}
+                  disabled={adding || owned}
                   className={cn(
-                    "h-7 text-[10px] px-2",
+                    "w-full h-7 rounded-md text-[10px] font-semibold flex items-center justify-center gap-1 transition-colors",
                     owned
-                      ? "bg-primary/20 text-primary border border-primary/40 hover:bg-primary/30"
+                      ? "bg-primary/15 text-primary border border-primary/30"
                       : "bg-gradient-gold text-background hover:opacity-90"
                   )}
-                  onClick={() => !owned && onAdd(card)}
-                  disabled={adding}
                 >
                   {adding ? (
                     <Loader2 className="h-3 w-3 animate-spin" />
                   ) : owned ? (
-                    <><Check className="h-3 w-3 mr-1" /> Tenho</>
+                    <><Check className="h-3 w-3" /> Tenho</>
                   ) : (
-                    <><Plus className="h-3 w-3 mr-1" /> Tenho essa</>
+                    <><Plus className="h-3 w-3" /> Tenho essa</>
                   )}
-                </Button>
+                </button>
               ) : (
-                <Button
-                  size="sm"
-                  className="h-7 text-[10px] px-2 border border-border/60 bg-card/60 hover:bg-surface-elevated"
+                <button
                   onClick={onLoginRequired}
+                  className="w-full h-7 rounded-md text-[10px] font-semibold border border-border/60 bg-card/80 text-muted-foreground hover:text-foreground hover:border-border transition-colors flex items-center justify-center gap-1"
                 >
-                  <Lock className="h-3 w-3 mr-1" /> Marcar
-                </Button>
+                  <Lock className="h-3 w-3" /> Marcar
+                </button>
               )}
             </div>
           </div>
@@ -291,7 +329,7 @@ function CardTile({
       <div className="p-1.5 bg-card/40">
         <p className="text-[10px] font-medium truncate">{card.name}</p>
         <div className="flex items-center justify-between gap-1">
-          <p className={cn("text-[9px]", rarityColor(card.rarity))}>{card.rarity?.split(" ").slice(-1)[0]}</p>
+          <p className={cn("text-[9px] font-medium", rarityColor(card.rarity))}>{card.rarity?.split(" ").slice(-1)[0]}</p>
           {card.types[0] && <EnergyIcon type={card.types[0]} size={12} />}
         </div>
       </div>
@@ -310,7 +348,6 @@ const SetDetail = () => {
   const [cards, setCards] = useState<SetCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [ownedIds, setOwnedIds] = useState<Set<string>>(new Set());
-  const [ownershipLoading, setOwnershipLoading] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("all");
   const [rarityFilter, setRarityFilter] = useState<string>("all");
@@ -334,22 +371,16 @@ const SetDetail = () => {
 
     fetch(`${baseUrl}/api/public/sets/${setId}/cards`)
       .then((r) => r.json())
-      .then((data) => {
-        if (data?.cards) setCards(data.cards);
-      })
+      .then((data) => { if (data?.cards) setCards(data.cards); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [setId]);
 
   useEffect(() => {
     if (!session || !setId) return;
-    setOwnershipLoading(true);
     api.get(`/portfolios/set-ownership/${setId}`)
-      .then(({ data }) => {
-        setOwnedIds(new Set(data.ownedTcgIds ?? []));
-      })
-      .catch(() => {})
-      .finally(() => setOwnershipLoading(false));
+      .then(({ data }) => setOwnedIds(new Set(data.ownedTcgIds ?? [])))
+      .catch(() => {});
   }, [session, setId]);
 
   useEffect(() => {
@@ -366,27 +397,11 @@ const SetDetail = () => {
     }
     setAddingId(card.tcgId);
     try {
-      await addItem(
-        defaultPortfolio._id,
-        card.tcgId,
-        1,
-        "NM",
-        false,
-        "",
-        null,
-        {
-          name:      card.name,
-          setName:   card.setName,
-          setCode:   setId ?? "",
-          number:    card.number,
-          rarity:    card.rarity,
-          types:     card.types,
-          imageUrl:  card.imageUrl,
-          supertype: card.supertype,
-          subtypes:  card.subtypes,
-          hp:        card.hp,
-        }
-      );
+      await addItem(defaultPortfolio._id, card.tcgId, 1, "NM", false, "", null, {
+        name: card.name, setName: card.setName, setCode: setId ?? "",
+        number: card.number, rarity: card.rarity, types: card.types,
+        imageUrl: card.imageUrl, supertype: card.supertype, subtypes: card.subtypes, hp: card.hp,
+      });
       setOwnedIds((prev) => new Set([...prev, card.tcgId]));
       modal.success("Adicionado!", `${card.name} adicionada à sua coleção.`);
     } catch {
@@ -396,16 +411,11 @@ const SetDetail = () => {
     }
   }, [session, defaultPortfolio, addItem, setId]);
 
-  const handleLoginRequired = () => {
-    navigate("/", { state: { openModal: "signup" } });
-  };
+  const handleLoginRequired = () => navigate("/", { state: { openModal: "signup" } });
 
   const handleBack = () => {
-    if (window.history.length > 2) {
-      navigate(-1);
-    } else {
-      navigate("/sets");
-    }
+    if (window.history.length > 2) navigate(-1);
+    else navigate("/sets");
   };
 
   const allTypes = Array.from(new Set(cards.flatMap((c) => c.types))).filter(Boolean).sort();
@@ -421,27 +431,25 @@ const SetDetail = () => {
   const pct = cards.length > 0 ? Math.round((ownedCount / cards.length) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
+      <PublicHeader />
 
-      {/* Header */}
-      <div className="border-b border-border/50 bg-card/40 backdrop-blur sticky top-0 z-20 relative">
-        <div className="absolute bottom-0 left-0 right-0 h-px pointer-events-none"
-          style={{ background: "linear-gradient(90deg, #FF6A00, #1B87E6, #3DAD4C, #DAA800, #E8579A, #C03028, #4A4878, #8BA6BB, #5060C0, #DA6FC8, #A0A0B8)" }}
-        />
-        <div className="container flex items-center gap-4 py-4">
+      {/* Sub-header do set */}
+      <div className="border-b border-border/40 bg-card/30">
+        <div className="container flex items-center gap-3 py-3">
           <button
             onClick={handleBack}
-            className="p-2 rounded-lg hover:bg-surface-elevated transition-colors text-muted-foreground hover:text-foreground"
+            className="p-1.5 rounded-lg hover:bg-surface-elevated transition-colors text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
 
           {setInfo?.logo && (
-            <img src={setInfo.logo} alt={setInfo.name} className="h-8 object-contain" />
+            <img src={setInfo.logo} alt={setInfo.name} className="h-7 object-contain" />
           )}
 
           <div className="flex-1 min-w-0">
-            <h1 className="font-display font-bold text-lg truncate">
+            <h1 className="font-display font-bold text-base truncate">
               {setInfo?.name ?? setId}
             </h1>
             <p className="text-xs text-muted-foreground">
@@ -452,91 +460,74 @@ const SetDetail = () => {
           {session && cards.length > 0 && (
             <div className="hidden sm:flex flex-col items-end gap-1">
               <p className="text-xs text-muted-foreground">
-                <span className="text-primary font-bold text-sm">{ownedCount}</span>
-                /{cards.length} possuídas
+                <span className="text-primary font-bold text-sm">{ownedCount}</span>/{cards.length}
               </p>
-              <div className="w-32 h-1.5 rounded-full bg-border">
-                <div
-                  className="h-full rounded-full bg-gradient-gold transition-all duration-500"
-                  style={{ width: `${pct}%` }}
-                />
+              <div className="w-28 h-1.5 rounded-full bg-border">
+                <div className="h-full rounded-full bg-gradient-gold transition-all duration-500" style={{ width: `${pct}%` }} />
               </div>
             </div>
           )}
         </div>
       </div>
 
-      <div className="container py-6">
+      <div className="container py-5 flex-1">
 
         {/* Progresso mobile */}
         {session && cards.length > 0 && (
-          <div className="sm:hidden mb-5 p-4 rounded-xl border border-border/50 bg-card/40">
+          <div className="sm:hidden mb-4 p-3 rounded-xl border border-border/50 bg-card/40">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-semibold">Progresso do set</p>
-              <p className="text-sm">
-                <span className="text-primary font-bold">{ownedCount}</span>/{cards.length} · {pct}%
-              </p>
+              <p className="text-sm font-semibold">Progresso</p>
+              <p className="text-sm"><span className="text-primary font-bold">{ownedCount}</span>/{cards.length} · {pct}%</p>
             </div>
             <div className="h-2 rounded-full bg-border">
-              <div
-                className="h-full rounded-full bg-gradient-gold transition-all duration-700"
-                style={{ width: `${pct}%` }}
-              />
+              <div className="h-full rounded-full bg-gradient-gold transition-all duration-700" style={{ width: `${pct}%` }} />
             </div>
           </div>
         )}
 
         {/* Filtros */}
         {!loading && cards.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-5">
-            <div className="flex items-center gap-1 flex-wrap">
+          <div className="flex flex-wrap gap-3 mb-4 items-center">
+            {/* Tipos */}
+            <div className="flex items-center gap-1.5 flex-wrap">
               <button
                 onClick={() => setFilter("all")}
-                className={cn(
-                  "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                className={cn("px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
                   filter === "all"
                     ? "bg-primary/15 text-primary border-primary/30"
-                    : "border-border/50 text-muted-foreground hover:text-foreground"
-                )}
-              >
-                Todos
-              </button>
+                    : "border-border/50 text-muted-foreground hover:text-foreground")}
+              >Todos</button>
               {allTypes.map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setFilter(type)}
-                  className={cn(
-                    "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border transition-colors",
+                <button key={type} onClick={() => setFilter(type)}
+                  className={cn("flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border transition-colors",
                     filter === type
                       ? "bg-primary/15 text-primary border-primary/30"
-                      : "border-border/50 text-muted-foreground hover:text-foreground"
-                  )}
+                      : "border-border/50 text-muted-foreground hover:text-foreground")}
                 >
-                  <EnergyIcon type={type} size={12} />
-                  {type}
+                  <EnergyIcon type={type} size={12} />{type}
                 </button>
               ))}
             </div>
 
-            <select
-              value={rarityFilter}
-              onChange={(e) => setRarityFilter(e.target.value)}
-              className="ml-auto px-2.5 py-1 rounded-full text-xs font-medium border border-border/50 bg-card/60 text-muted-foreground focus:outline-none focus:border-primary/40"
-            >
-              <option value="all">Todas raridades</option>
-              {allRarities.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
+            {/* Raridade — select estilizado */}
+            <div className="ml-auto">
+              <select
+                value={rarityFilter}
+                onChange={(e) => setRarityFilter(e.target.value)}
+                className="h-8 px-3 pr-7 rounded-full text-xs font-medium border border-border/60 bg-card text-foreground focus:outline-none focus:border-primary/50 appearance-none cursor-pointer"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center" }}
+              >
+                <option value="all">Todas raridades</option>
+                {allRarities.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
           </div>
         )}
 
         {/* Contagem */}
         {!loading && (
-          <p className="text-xs text-muted-foreground mb-4">
-            {filtered.length === cards.length
-              ? `${cards.length} cartas`
-              : `${filtered.length} de ${cards.length} cartas`}
+          <p className="text-xs text-muted-foreground mb-3">
+            {filtered.length === cards.length ? `${cards.length} cartas` : `${filtered.length} de ${cards.length} cartas`}
             {session && ` · ${ownedCount} possuídas`}
           </p>
         )}
@@ -551,7 +542,7 @@ const SetDetail = () => {
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
             <Star className="h-10 w-10 mx-auto mb-3 opacity-20" />
-            <p>Nenhuma carta encontrada para os filtros selecionados.</p>
+            <p>Nenhuma carta encontrada.</p>
           </div>
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
@@ -574,7 +565,7 @@ const SetDetail = () => {
         {!session && !loading && (
           <div className="mt-8 text-center p-6 rounded-xl border border-border/40 bg-card/30">
             <p className="text-sm text-muted-foreground mb-3">
-              Crie uma conta para marcar as cartas que você possui e acompanhar seu progresso.
+              Crie uma conta para marcar as cartas e acompanhar seu progresso.
             </p>
             <Link
               to="/"
@@ -588,7 +579,7 @@ const SetDetail = () => {
       </div>
 
       {/* Footer */}
-      <footer className="container py-4 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between relative mt-4">
+      <footer className="container py-4 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between relative mt-auto">
         <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
           style={{ background: "linear-gradient(90deg, #FF6A00, #1B87E6, #3DAD4C, #DAA800, #E8579A, #C03028, #4A4878, #8BA6BB, #5060C0, #DA6FC8, #A0A0B8)" }}
         />
@@ -606,7 +597,6 @@ const SetDetail = () => {
           onAdd={handleAdd}
           onClose={() => setSelectedCard(null)}
           onLoginRequired={handleLoginRequired}
-          setId={setId ?? ""}
         />
       )}
     </div>

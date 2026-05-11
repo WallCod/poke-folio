@@ -39,6 +39,9 @@ import {
   Crown,
   Sparkles,
   Pencil,
+  KeyRound,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 const rarityWeight: Record<string, number> = {
@@ -109,6 +112,31 @@ const Profile = () => {
   const [editNameLoading, setEditNameLoading] = useState(false);
   const displayName = session?.name && session.name !== "Treinador" ? session.name : user.name;
 
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [showCurrentPwd, setShowCurrentPwd] = useState(false);
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [changePwdLoading, setChangePwdLoading] = useState(false);
+
+  // Avatar color — salvo em localStorage
+  const AVATAR_COLORS = [
+    "from-yellow-400 to-orange-500",
+    "from-purple-500 to-pink-500",
+    "from-blue-500 to-cyan-400",
+    "from-green-400 to-emerald-600",
+    "from-red-500 to-orange-400",
+    "from-indigo-500 to-purple-600",
+  ];
+  const [avatarColor, setAvatarColor] = useState(() => {
+    return localStorage.getItem("pokefolio.avatarColor") ?? "from-yellow-400 to-orange-500";
+  });
+  const handleAvatarColor = (color: string) => {
+    setAvatarColor(color);
+    localStorage.setItem("pokefolio.avatarColor", color);
+  };
+
   // Set stats
   const [setStats, setSetStats] = useState<{ setCode: string; setName: string; owned: number; totalInDb: number }[]>([]);
   const [sets, setSets] = useState<{ id: string; total: number }[]>([]);
@@ -137,6 +165,34 @@ const Profile = () => {
       .then((d) => Array.isArray(d) && setSets(d.map((s: any) => ({ id: s.id, total: s.total }))))
       .catch(() => {});
   }, []);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword) {
+      modal.error("Campos obrigatórios", "Preencha todos os campos.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      modal.error("Senha fraca", "A nova senha deve ter ao menos 6 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      modal.error("Senhas diferentes", "A confirmação não bate com a nova senha.");
+      return;
+    }
+    setChangePwdLoading(true);
+    try {
+      const { default: api } = await import('@/lib/api');
+      await api.post('/auth/change-password', { currentPassword, newPassword });
+      setChangePasswordOpen(false);
+      setCurrentPassword(""); setNewPassword(""); setConfirmNewPassword("");
+      modal.success("Senha atualizada!", "Sua senha foi alterada com sucesso.");
+    } catch (err: unknown) {
+      modal.error("Erro", (err as any)?.response?.data?.error ?? "Não foi possível alterar a senha.");
+    } finally {
+      setChangePwdLoading(false);
+    }
+  };
 
   const handleEditName = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -284,11 +340,22 @@ const Profile = () => {
       {/* Hero */}
       <div className="glass-panel p-6 md:p-8">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-          <div className="relative shrink-0">
-            <div className="h-24 w-24 md:h-28 md:w-28 rounded-2xl bg-gradient-gold flex items-center justify-center shadow-glow-gold">
-              <span className="font-display text-5xl font-bold text-background select-none">
+          <div className="relative shrink-0 group/avatar">
+            <div className={cn("h-24 w-24 md:h-28 md:w-28 rounded-2xl bg-gradient-to-br flex items-center justify-center shadow-lg", avatarColor)}>
+              <span className="font-display text-5xl font-bold text-white select-none">
                 {displayName.charAt(0).toUpperCase()}
               </span>
+            </div>
+            {/* Selector de cor do avatar */}
+            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 hidden group-hover/avatar:flex items-center gap-1 bg-card border border-border/70 rounded-full px-2 py-1 shadow-lg z-10">
+              {AVATAR_COLORS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => handleAvatarColor(c)}
+                  className={cn("h-5 w-5 rounded-full bg-gradient-to-br border-2 transition-transform hover:scale-110", c,
+                    avatarColor === c ? "border-white scale-110" : "border-transparent")}
+                />
+              ))}
             </div>
             {isAdmin && (
               <div className="absolute -bottom-2 -right-2 h-7 w-7 rounded-lg bg-[hsl(28_85%_44%)] flex items-center justify-center shadow-lg border border-background">
@@ -652,7 +719,16 @@ const Profile = () => {
           </Select>
         </div>
 
-        <div className="pt-2 border-t border-border/40">
+        <div className="space-y-2 pt-2 border-t border-border/40">
+          <Label className="text-sm font-medium">Conta</Label>
+          <Button
+            variant="outline"
+            onClick={() => { setCurrentPassword(""); setNewPassword(""); setConfirmNewPassword(""); setChangePasswordOpen(true); }}
+            className="w-full h-11 border-border/60 rounded-xl gap-2 font-medium justify-start text-muted-foreground hover:text-foreground"
+          >
+            <KeyRound className="h-4 w-4" />
+            Mudar senha
+          </Button>
           <Button
             onClick={() => {
               clearSession();
@@ -667,6 +743,74 @@ const Profile = () => {
           </Button>
         </div>
       </div>
+
+      {/* Dialog — mudar senha */}
+      <Dialog open={changePasswordOpen} onOpenChange={(v) => !v && setChangePasswordOpen(false)}>
+        <DialogContent className="bg-card border-border/70 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-primary" /> Mudar senha
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleChangePassword} className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="current-pwd">Senha atual</Label>
+              <div className="relative">
+                <Input
+                  id="current-pwd"
+                  type={showCurrentPwd ? "text" : "password"}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="surface-elevated border-border/70 pr-10"
+                  autoFocus
+                />
+                <button type="button" onClick={() => setShowCurrentPwd((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  {showCurrentPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-pwd">Nova senha</Label>
+              <div className="relative">
+                <Input
+                  id="new-pwd"
+                  type={showNewPwd ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  className="surface-elevated border-border/70 pr-10"
+                />
+                <button type="button" onClick={() => setShowNewPwd((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  {showNewPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-pwd">Confirmar nova senha</Label>
+              <Input
+                id="confirm-pwd"
+                type="password"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                placeholder="Repita a nova senha"
+                className="surface-elevated border-border/70"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button type="button" variant="outline" className="flex-1 border-border/60" onClick={() => setChangePasswordOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="flex-1 bg-gradient-gold text-background font-semibold hover:opacity-90"
+                disabled={changePwdLoading}>
+                {changePwdLoading ? "Salvando..." : "Alterar senha"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog — editar nome */}
       <Dialog open={editNameOpen} onOpenChange={(v) => !v && setEditNameOpen(false)}>

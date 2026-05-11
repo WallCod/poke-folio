@@ -216,22 +216,33 @@ async function getMypCardsBrl(
       }) ?? null;
     }
 
-    // Fallback: match apenas pelo número
+    // Fallback: match apenas pelo número (sem fallback para cards[0] — causa preços errados)
     if (!match) {
       match = cards.find((c) => {
         const parts = c.card_code.split('_');
         const numPart = parts[parts.length - 1]?.split('/')[0] ?? '';
         return numPart.replace(/^0+/, '') === num.replace(/^0+/, '');
-      }) ?? cards[0];
+      }) ?? null;
     }
+
+    // Sem match preciso → não retorna preço errado
+    if (!match) return { floor: null, avg: null, max: null, fullNumber: null };
 
     const rawNumSegment = match.card_code.split('_').pop() ?? '';
     const fullNumber = /^\d+\/\d+$/.test(rawNumSegment) ? rawNumSegment : null;
 
+    const floor = match.min_price ? parseFloat(match.min_price) : null;
+    const avg   = match.avg_price ? parseFloat(match.avg_price) : null;
+    const max   = match.max_price ? parseFloat(match.max_price) : null;
+
+    // Sanidade: se o preço floor for < R$0.50 e avg for muito maior, usa avg
+    // Também descarta se floor < R$0.10 (provavelmente dado inválido)
+    const safeFloor = floor !== null && floor >= 0.1 ? floor : (avg !== null && avg >= 0.1 ? avg : null);
+
     return {
-      floor: match.min_price ? parseFloat(match.min_price) : null,
-      avg:   match.avg_price ? parseFloat(match.avg_price) : null,
-      max:   match.max_price ? parseFloat(match.max_price) : null,
+      floor: safeFloor,
+      avg,
+      max,
       fullNumber,
     };
   } catch {

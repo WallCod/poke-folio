@@ -1,8 +1,5 @@
-import { Link } from "react-router-dom";
-import { Logo } from "@/components/Logo";
-import { getSession } from "@/lib/auth";
-import { useNavigate } from "react-router-dom";
-import { Crown, BookOpen, Sparkles, Shield, TrendingUp, Star, Layers, Zap, ArrowRight, ChevronDown } from "lucide-react";
+import { PublicHeader } from "@/components/PublicHeader";
+import { Shield, TrendingUp, Star, Layers, Zap, ArrowRight, ChevronDown, BookOpen, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -61,33 +58,9 @@ const AccordionItem = ({ q, r }: { q: string; r: string }) => {
 };
 
 const GuiaTcg = () => {
-  const session = getSession();
-  const navigate = useNavigate();
-
   return (
     <div className="min-h-screen flex flex-col animate-fade-in">
-      {/* Header */}
-      <header className="border-b border-border/60 backdrop-blur-xl bg-background/80 sticky top-0 z-40">
-        <div className="container flex h-16 items-center justify-between">
-          <Logo />
-          <nav className="hidden sm:flex items-center gap-1">
-            <Link to="/guia-tcg" className="px-3.5 py-2 rounded-lg text-sm font-medium text-primary bg-surface-elevated transition-colors flex items-center gap-1.5">
-              <BookOpen className="h-3.5 w-3.5" /> Guia TCG
-            </Link>
-            <Link to="/sobre" className="px-3.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors">
-              Sobre
-            </Link>
-            <Link to="/pricing" className="px-3.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors flex items-center gap-1.5">
-              <Crown className="h-3.5 w-3.5 text-primary" /> Planos
-            </Link>
-          </nav>
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate("/")} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              ← Voltar à home
-            </button>
-          </div>
-        </div>
-      </header>
+      <PublicHeader />
 
       <main className="flex-1">
         {/* Hero */}

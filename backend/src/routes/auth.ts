@@ -310,6 +310,49 @@ router.get('/me', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// ─── POST /api/auth/change-password ──────────────────────────────────────────
+router.post('/change-password', async (req: Request, res: Response): Promise<void> => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) {
+    res.status(401).json({ error: 'Token não fornecido' });
+    return;
+  }
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET!) as { id: string };
+    const { currentPassword, newPassword } = req.body as { currentPassword?: string; newPassword?: string };
+
+    if (!currentPassword || !newPassword) {
+      res.status(422).json({ error: 'Informe a senha atual e a nova senha.' });
+      return;
+    }
+    if (newPassword.length < 6) {
+      res.status(422).json({ error: 'A nova senha deve ter ao menos 6 caracteres.' });
+      return;
+    }
+
+    const user = await User.findById(payload.id).select('+password');
+    if (!user) {
+      res.status(404).json({ error: 'Usuário não encontrado' });
+      return;
+    }
+
+    const bcrypt = await import('bcryptjs');
+    const valid = await bcrypt.default.compare(currentPassword, user.password ?? '');
+    if (!valid) {
+      res.status(401).json({ error: 'Senha atual incorreta.' });
+      return;
+    }
+
+    user.password = newPassword; // pre-save hook hashes it
+    await user.save();
+    res.json({ ok: true });
+  } catch {
+    res.status(401).json({ error: 'Token inválido' });
+  }
+});
+
 // ─── PATCH /api/auth/me ───────────────────────────────────────────────────────
 router.patch('/me', async (req: Request, res: Response): Promise<void> => {
   const authHeader = req.headers.authorization;

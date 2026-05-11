@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Logo } from "@/components/Logo";
-import { AvatarMenu } from "@/components/AppLayout";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { PublicHeader } from "@/components/PublicHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +17,6 @@ import { mockLogin, setSessionFromApi, getSession, clearSession } from "@/lib/au
 import { authApi } from "@/lib/api";
 import api from "@/lib/api";
 import { modal } from "@/store/useAppModal";
-import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 // ─── SVG Decorativos ─────────────────────────────────────────────────────────
@@ -271,7 +269,6 @@ const Landing = () => {
   const [sets, setSets] = useState<TcgSet[]>([]);
   const [setsLoading, setSetsLoading] = useState(true);
   const [setsFilter, setSetsFilter] = useState("all");
-  const [setsShowAll, setSetsShowAll] = useState(false);
 
   const [trending, setTrending] = useState<{ gainers: TrendCard[]; losers: TrendCard[]; popular: TrendCard[] } | null>(null);
   const [trendPeriod, setTrendPeriod] = useState<"day" | "week" | "month">("week");
@@ -359,7 +356,7 @@ const Landing = () => {
 
   const allSeries = Array.from(new Set(sets.map((s) => s.series))).filter(Boolean);
   const filteredSets = setsFilter === "all" ? sets : sets.filter((s) => s.series === setsFilter);
-  const visibleSets = setsShowAll ? filteredSets : filteredSets.slice(0, 24);
+  const visibleSets = filteredSets.slice(0, 24);
   const trendCards = trending
     ? (trendTab === "gainers" ? trending.gainers : trendTab === "losers" ? trending.losers : trending.popular)
     : [];
@@ -381,38 +378,10 @@ const Landing = () => {
       <CardDecor className="absolute right-[14%] top-[30%] w-10 text-primary opacity-[0.08] -rotate-6 pointer-events-none hidden lg:block" />
       <CardDecor className="absolute left-[6%] top-[35%] w-12 text-primary opacity-[0.07] rotate-[-15deg] pointer-events-none hidden lg:block" />
 
-      {/* ── Header fixo ── */}
-      <header className="sticky top-0 z-50 w-full backdrop-blur-xl bg-background/75 border-b border-border/60">
-        {/* Linha de tipos no fundo do header */}
-        <div className="absolute bottom-0 left-0 right-0 h-px pointer-events-none"
-          style={{ background: "linear-gradient(90deg, #FF6A00, #1B87E6, #3DAD4C, #DAA800, #E8579A, #C03028, #4A4878, #8BA6BB, #5060C0, #DA6FC8, #A0A0B8)" }}
-        />
-        <div className="container flex h-16 items-center justify-between gap-4">
-          <Logo />
-          <nav className="hidden sm:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
-            <Link to="/guia-tcg" className="px-3.5 py-2 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors">Guia TCG</Link>
-            <Link to="/sobre" className="px-3.5 py-2 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors">Sobre</Link>
-            <Link to="/sets" className="px-3.5 py-2 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-primary" /> Sets
-            </Link>
-            <Link to="/pricing" className="px-3.5 py-2 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors flex items-center gap-1.5">
-              <Crown className="h-3.5 w-3.5 text-primary" /> Planos
-            </Link>
-          </nav>
-          <div className="flex items-center gap-2">
-          {session ? (
-            <>
-              <span className="text-sm text-muted-foreground hidden sm:block">Olá, <strong className="text-foreground">{session.name}</strong></span>
-              <AvatarMenu displayName={session.name} isAdmin={session.role === "admin"} size="lg" onNavigate={navigate} onLogout={() => { clearSession(); setSession(null); }} />
-            </>
-          ) : (
-            <>
-              <Button variant="ghost" onClick={() => setOpen("login")} className="text-foreground hover:bg-surface-elevated rounded-full">Entrar</Button>
-              <Button onClick={() => setOpen("signup")} className="bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold transition-all rounded-full">Criar conta</Button>
-            </>
-          )}
-        </div>
-      </header>
+      <PublicHeader
+        onLoginClick={() => setOpen("login")}
+        onSignupClick={() => setOpen("signup")}
+      />
 
       {/* ── Hero com campo hexagonal ── */}
       <section className="container flex-1 flex items-start pt-10 md:pt-14 pb-8 relative">
@@ -662,11 +631,12 @@ const Landing = () => {
               </div>
               {filteredSets.length > 24 && (
                 <div className="text-center mt-5">
-                  <Button variant="outline" size="sm" onClick={() => setSetsShowAll((v) => !v)}
-                    className="border-border/60 text-muted-foreground hover:text-foreground">
-                    {setsShowAll ? "Mostrar menos" : `Ver todos os ${filteredSets.length} sets`}
-                    <ArrowRight className={cn("h-3.5 w-3.5 ml-1.5 transition-transform", setsShowAll && "rotate-90")} />
-                  </Button>
+                  <Link to="/sets">
+                    <Button variant="outline" size="sm" className="border-border/60 text-muted-foreground hover:text-foreground">
+                      Ver todos os {sets.length} sets
+                      <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                    </Button>
+                  </Link>
                 </div>
               )}
             </>

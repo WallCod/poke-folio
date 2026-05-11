@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Check, Sparkles, Crown, Zap, ArrowRight, BookOpen } from "lucide-react";
+import { Check, Sparkles, Crown, Zap, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getSession } from "@/lib/auth";
 import { getUsers } from "@/lib/storage";
-import { Logo } from "@/components/Logo";
+import { PublicHeader } from "@/components/PublicHeader";
 
 type Billing = "monthly" | "annual";
 
@@ -91,53 +91,10 @@ const Pricing = () => {
 
   return (
     <div className="min-h-screen flex flex-col animate-fade-in">
-      {/* Header standalone */}
-      <header className="border-b border-border/60 backdrop-blur-xl bg-background/80 sticky top-0 z-40">
-        <div className="container flex h-16 items-center justify-between">
-          <Logo />
-          <nav className="hidden sm:flex items-center gap-1">
-            <Link to="/guia-tcg" className="px-3.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors flex items-center gap-1.5">
-              <BookOpen className="h-3.5 w-3.5" /> Guia TCG
-            </Link>
-            <Link to="/sobre" className="px-3.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors">
-              Sobre
-            </Link>
-            <Link to="/pricing" className="px-3.5 py-2 rounded-lg text-sm font-medium text-primary bg-surface-elevated transition-colors flex items-center gap-1.5">
-              <Crown className="h-3.5 w-3.5 text-primary" /> Planos
-            </Link>
-          </nav>
-          <div className="flex items-center gap-3">
-            {session ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/")}
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                ← Voltar à home
-              </Button>
-            ) : (
-              <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate("/", { state: { openModal: "login" } })}
-                  className="text-foreground hover:bg-surface-elevated"
-                >
-                  Entrar
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => navigate("/", { state: { openModal: "signup" } })}
-                  className="bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold"
-                >
-                  Criar conta
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
+      <PublicHeader
+        onLoginClick={() => navigate("/", { state: { openModal: "login" } })}
+        onSignupClick={() => navigate("/", { state: { openModal: "signup" } })}
+      />
 
     <div className="container pt-12 pb-16">
       {/* Header */}

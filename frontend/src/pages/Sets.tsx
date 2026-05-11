@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Sparkles, Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { PublicHeader } from "@/components/PublicHeader";
 
 interface TcgSet {
   id: string;
@@ -73,74 +73,74 @@ const Sets = () => {
   });
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b border-border/50 bg-card/40 backdrop-blur sticky top-0 z-20 relative">
-        <div className="absolute bottom-0 left-0 right-0 h-px pointer-events-none"
-          style={{ background: "linear-gradient(90deg, #FF6A00, #1B87E6, #3DAD4C, #DAA800, #E8579A, #C03028, #4A4878, #8BA6BB, #5060C0, #DA6FC8, #A0A0B8)" }}
-        />
-        <div className="container flex items-center gap-4 py-4">
-          <Link to="/" className="p-2 rounded-lg hover:bg-surface-elevated transition-colors text-muted-foreground hover:text-foreground">
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5M12 5l-7 7 7 7" />
-            </svg>
-          </Link>
-          <div className="flex items-center gap-2">
+    <div className="min-h-screen bg-background flex flex-col">
+      <PublicHeader />
+
+      <div className="container py-8 flex-1">
+
+        {/* Título */}
+        <div className="mb-6">
+          <h1 className="font-display text-2xl font-bold flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            <h1 className="font-display font-bold text-xl">Todos os Sets</h1>
-          </div>
-          <p className="text-xs text-muted-foreground hidden sm:block">
-            {loading ? "Carregando..." : `${sets.length} sets disponíveis`}
+            Todos os Sets
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {loading ? "Carregando..." : `${sets.length} sets disponíveis · clique para ver as cartas`}
           </p>
         </div>
-      </div>
 
-      <div className="container py-6">
-        {/* Busca + filtros */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Buscar set..."
+        {/* Search + filtros */}
+        <div className="flex flex-col gap-4 mb-6">
+          {/* Busca */}
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Buscar set por nome ou série..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-9 text-sm bg-card/60 border-border/60"
+              className="w-full h-11 pl-11 pr-4 rounded-xl border border-border/60 bg-card/60 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30 transition-colors"
             />
           </div>
 
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              onClick={() => setSeriesFilter("all")}
-              className={cn(
-                "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
-                seriesFilter === "all"
-                  ? "bg-primary/15 text-primary border-primary/30"
-                  : "border-border/50 text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Todos
-            </button>
-            {allSeries.map((s) => (
+          {/* Filtros de série */}
+          {allSeries.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
               <button
-                key={s}
-                onClick={() => setSeriesFilter(s)}
+                onClick={() => setSeriesFilter("all")}
                 className={cn(
-                  "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
-                  seriesFilter === s
+                  "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                  seriesFilter === "all"
                     ? "bg-primary/15 text-primary border-primary/30"
-                    : "border-border/50 text-muted-foreground hover:text-foreground"
+                    : "border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
                 )}
               >
-                {s}
+                Todos
               </button>
-            ))}
-          </div>
+              {allSeries.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSeriesFilter(s)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                    seriesFilter === s
+                      ? "bg-primary/15 text-primary border-primary/30"
+                      : "border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
+                  )}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Contagem */}
         {!loading && (
           <p className="text-xs text-muted-foreground mb-4">
-            {filtered.length === sets.length ? `${sets.length} sets` : `${filtered.length} de ${sets.length} sets`}
+            {filtered.length === sets.length
+              ? `${sets.length} sets`
+              : `${filtered.length} de ${sets.length} sets`}
           </p>
         )}
 
@@ -166,7 +166,7 @@ const Sets = () => {
       </div>
 
       {/* Footer */}
-      <footer className="container py-4 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between relative mt-8">
+      <footer className="container py-4 border-t border-border/50 text-xs text-muted-foreground flex items-center justify-between relative mt-auto">
         <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
           style={{ background: "linear-gradient(90deg, #FF6A00, #1B87E6, #3DAD4C, #DAA800, #E8579A, #C03028, #4A4878, #8BA6BB, #5060C0, #DA6FC8, #A0A0B8)" }}
         />

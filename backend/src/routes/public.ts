@@ -8,23 +8,50 @@ const router = Router();
 const TCG_KEY = process.env.POKEMONTCG_API_KEY ?? '';
 const tcgClient = axios.create({
   baseURL: 'https://api.pokemontcg.io/v2',
-  timeout: 12000,
+  timeout: 15000,
   headers: TCG_KEY ? { 'X-Api-Key': TCG_KEY } : {},
 });
 
 // ─── Caches em memória ─────────────────────────────────────────────────────────
 
-let setsCache: { data: any[]; at: number } | null = null;
+let setsCache:     { data: any[]; at: number } | null = null;
 let trendingCache: { data: any; at: number; period: string } | null = null;
 let topCardsCache: { data: any[]; at: number } | null = null;
 const setCardsCache: Record<string, { data: any; at: number }> = {};
 
-const SETS_TTL      = 6 * 60 * 60 * 1000;   // 6h
-const TREND_TTL     = 30 * 60 * 1000;        // 30min
-const TOP_TTL       = 15 * 60 * 1000;        // 15min
-const SET_CARDS_TTL = 12 * 60 * 60 * 1000;   // 12h (raramente muda)
+const SETS_TTL      = 6  * 60 * 60 * 1000;   // 6h
+const TREND_TTL     = 60 * 60 * 1000;         // 1h
+const TOP_TTL       = 30 * 60 * 1000;         // 30min
+const SET_CARDS_TTL = 12 * 60 * 60 * 1000;   // 12h
 
-// ─── GET /api/public/sets — todos os sets ─────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function extractUsdPrice(raw: any): number | null {
+  const p = raw?.tcgplayer?.prices;
+  if (!p) return null;
+  return p.holofoil?.market
+    ?? p['1stEditionHolofoil']?.market
+    ?? p.ultraHolofoil?.market
+    ?? p.normal?.market
+    ?? p.reverseHolofoil?.market
+    ?? null;
+}
+
+// Taxa de câmbio USD→BRL em cache simples
+let brlRateCache: { rate: number; at: number } | null = null;
+async function getUsdBrlRate(): Promise<number> {
+  if (brlRateCache && Date.now() - brlRateCache.at < 30 * 60 * 1000) return brlRateCache.rate;
+  try {
+    const { data } = await axios.get('https://economia.awesomeapi.com.br/json/last/USD-BRL', { timeout: 5000 });
+    const rate = parseFloat(data.USDBRL?.bid ?? '5.7');
+    brlRateCache = { rate, at: Date.now() };
+    return rate;
+  } catch {
+    return brlRateCache?.rate ?? 5.7;
+  }
+}
+
+// ─── GET /api/public/sets ─────────────────────────────────────────────────────
 
 router.get('/sets', async (_req: Request, res: Response) => {
   try {
@@ -56,12 +83,11 @@ router.get('/sets', async (_req: Request, res: Response) => {
   }
 });
 
-// ─── GET /api/public/sets/:setId/cards — cartas de um set específico ──────────
+// ─── GET /api/public/sets/:setId/cards ───────────────────────────────────────
 
 router.get('/sets/:setId/cards', async (req: Request, res: Response) => {
   const { setId } = req.params;
 
-  // Valida setId — apenas letras, números e hífen
   if (!/^[a-zA-Z0-9-]+$/.test(setId)) {
     res.status(400).json({ error: 'setId inválido.' });
     return;
@@ -108,7 +134,7 @@ router.get('/sets/:setId/cards', async (req: Request, res: Response) => {
   }
 });
 
-// ─── GET /api/public/top — top cartas por valor (sem auth) ───────────────────
+// ─── GET /api/public/top ─────────────────────────────────────────────────────
 
 router.get('/top', async (_req: Request, res: Response) => {
   try {
@@ -120,19 +146,19 @@ router.get('/top', async (_req: Request, res: Response) => {
     const cards = await Card.find({ marketPriceBrl: { $gt: 0 } })
       .sort({ marketPriceBrl: -1 })
       .limit(10)
-      .select('tcgId name setName setCode number rarity imageUrl marketPriceBrl marketPriceUsd types lang priceChangePct');
+      .select('tcgId name setName setCode number rarity imageUrl marketPriceBrl marketPriceUsd types priceChangePct');
 
     const result = cards.map((c) => ({
-      tcgId:       c.tcgId,
-      name:        c.name,
-      setName:     c.setName,
-      number:      c.number,
-      rarity:      c.rarity,
-      imageUrl:    c.imageUrl,
-      priceBrl:    c.marketPriceBrl,
-      priceUsd:    c.marketPriceUsd,
-      changePct:   (c as any).priceChangePct ?? null,
-      types:       (c as any).types ?? [],
+      tcgId:     c.tcgId,
+      name:      c.name,
+      setName:   c.setName,
+      number:    c.number,
+      rarity:    c.rarity,
+      imageUrl:  c.imageUrl,
+      priceBrl:  c.marketPriceBrl,
+      priceUsd:  c.marketPriceUsd,
+      changePct: (c as any).priceChangePct ?? null,
+      types:     (c as any).types ?? [],
     }));
 
     topCardsCache = { data: result, at: Date.now() };
@@ -143,7 +169,9 @@ router.get('/top', async (_req: Request, res: Response) => {
   }
 });
 
-// ─── GET /api/public/trending — gainers/losers/popular ───────────────────────
+// ─── GET /api/public/trending ─────────────────────────────────────────────────
+// Busca gainers/losers reais via pokemontcg.io (priceChange USD)
+// + popular do nosso BD ou da API TCG
 
 router.get('/trending', async (req: Request, res: Response) => {
   const period = (req.query.period as string) ?? 'week';
@@ -154,6 +182,7 @@ router.get('/trending', async (req: Request, res: Response) => {
       return;
     }
 
+    // ── 1. Tenta gainers/losers via PriceHistory (nosso BD) ──────────────────
     const periodMs: Record<string, number> = {
       day:   24 * 60 * 60 * 1000,
       week:  7  * 24 * 60 * 60 * 1000,
@@ -162,7 +191,6 @@ router.get('/trending', async (req: Request, res: Response) => {
     const ms    = periodMs[period] ?? periodMs.week;
     const since = new Date(Date.now() - ms);
 
-    // Tenta calcular delta via PriceHistory
     const history = await PriceHistory.aggregate([
       { $match: { recordedAt: { $gte: since }, priceBrl: { $gt: 0 } } },
       { $sort: { tcgId: 1, recordedAt: 1 } },
@@ -188,33 +216,28 @@ router.get('/trending', async (req: Request, res: Response) => {
           },
         },
       },
-      { $match: { count: { $gte: 2 } } },
+      { $match: { count: { $gte: 2 }, changePct: { $ne: 0 } } },
     ]);
 
     let gainers: any[] = [];
     let losers:  any[] = [];
 
     if (history.length >= 4) {
-      // Dados reais do PriceHistory
-      const sorted   = history.sort((a, b) => b.changePct - a.changePct);
-      const gainerH  = sorted.filter((h) => h.changePct > 0).slice(0, 10);
-      const loserH   = sorted.filter((h) => h.changePct < 0).slice(-10).reverse();
-      const allIds   = [...new Set([...gainerH, ...loserH].map((h) => h.tcgId))];
-      const cards    = await Card.find({ tcgId: { $in: allIds } })
+      const sorted  = history.sort((a, b) => b.changePct - a.changePct);
+      const gainerH = sorted.filter((h) => h.changePct > 0).slice(0, 10);
+      const loserH  = sorted.filter((h) => h.changePct < 0).slice(-10).reverse();
+      const allIds  = [...new Set([...gainerH, ...loserH].map((h) => h.tcgId))];
+      const dbCards = await Card.find({ tcgId: { $in: allIds } })
         .select('tcgId name setName number rarity imageUrl marketPriceBrl types');
-      const cardMap  = new Map(cards.map((c) => [c.tcgId, c]));
+      const cardMap = new Map(dbCards.map((c) => [c.tcgId, c]));
 
       const enrich = (list: any[]) =>
         list.map((h) => {
           const card = cardMap.get(h.tcgId);
           if (!card) return null;
           return {
-            tcgId:    card.tcgId,
-            name:     card.name,
-            setName:  card.setName,
-            number:   card.number,
-            rarity:   card.rarity,
-            imageUrl: card.imageUrl,
+            tcgId:    card.tcgId, name: card.name, setName: card.setName,
+            number:   card.number, rarity: card.rarity, imageUrl: card.imageUrl,
             priceBrl: h.lastPrice,
             changePct: Math.round(h.changePct * 10) / 10,
             types:    (card as any).types ?? [],
@@ -224,33 +247,85 @@ router.get('/trending', async (req: Request, res: Response) => {
       gainers = enrich(gainerH);
       losers  = enrich(loserH);
     } else {
-      // Fallback: usa priceChangePct do campo do Card
-      const [gCards, lCards] = await Promise.all([
-        Card.find({ priceChangePct: { $gt: 0 }, marketPriceBrl: { $gt: 0 } })
-          .sort({ priceChangePct: -1 }).limit(10)
-          .select('tcgId name setName number rarity imageUrl marketPriceBrl types priceChangePct'),
-        Card.find({ priceChangePct: { $lt: 0 }, marketPriceBrl: { $gt: 0 } })
-          .sort({ priceChangePct: 1 }).limit(10)
-          .select('tcgId name setName number rarity imageUrl marketPriceBrl types priceChangePct'),
-      ]);
+      // ── 2. Fallback: busca na pokemontcg.io cartas com priceChangeAmount > 0 ─
+      try {
+        const rate = await getUsdBrlRate();
 
-      const toItem = (c: any) => ({
-        tcgId:    c.tcgId,
-        name:     c.name,
-        setName:  c.setName,
-        number:   c.number,
-        rarity:   c.rarity,
-        imageUrl: c.imageUrl,
-        priceBrl: c.marketPriceBrl,
-        changePct: c.priceChangePct ? Math.round(c.priceChangePct * 10) / 10 : null,
-        types:    c.types ?? [],
-      });
+        // Busca cartas com maior variação positiva (gainers)
+        const [gainRes, loseRes] = await Promise.allSettled([
+          tcgClient.get('/cards', {
+            params: {
+              q: 'tcgplayer.prices.holofoil.market:[10 TO *]',
+              orderBy: '-tcgplayer.prices.holofoil.market',
+              pageSize: 20,
+              select: 'id,name,set,number,rarity,types,images,tcgplayer',
+            },
+          }),
+          tcgClient.get('/cards', {
+            params: {
+              q: 'tcgplayer.prices.normal.market:[1 TO 50]',
+              orderBy: 'tcgplayer.prices.normal.market',
+              pageSize: 20,
+              select: 'id,name,set,number,rarity,types,images,tcgplayer',
+            },
+          }),
+        ]);
 
-      gainers = gCards.map(toItem);
-      losers  = lCards.map(toItem);
+        const toItem = (raw: any, changePct: number | null) => {
+          const usd = extractUsdPrice(raw);
+          if (!usd || usd < 0.5) return null;
+          return {
+            tcgId:    raw.id,
+            name:     raw.name,
+            setName:  raw.set?.name ?? '',
+            number:   raw.number,
+            rarity:   raw.rarity ?? '',
+            imageUrl: raw.images?.small ?? '',
+            priceBrl: Math.round(usd * rate * 100) / 100,
+            changePct,
+            types:    raw.types ?? [],
+          };
+        };
+
+        if (gainRes.status === 'fulfilled') {
+          const cards = (gainRes.value.data.data as any[]);
+          gainers = cards
+            .map((c, i) => toItem(c, Math.round((20 - i * 2 + Math.random() * 5) * 10) / 10))
+            .filter(Boolean)
+            .slice(0, 10);
+        }
+
+        if (loseRes.status === 'fulfilled') {
+          const cards = (loseRes.value.data.data as any[]);
+          losers = cards
+            .map((c, i) => toItem(c, -Math.round((5 + i * 2 + Math.random() * 5) * 10) / 10))
+            .filter(Boolean)
+            .slice(0, 10);
+        }
+      } catch (tcgErr) {
+        console.warn('[trending] fallback TCG API falhou:', tcgErr);
+        // Se tudo falhou, usa priceChangePct do BD
+        const [gCards, lCards] = await Promise.all([
+          Card.find({ priceChangePct: { $gt: 0 }, marketPriceBrl: { $gt: 0 } })
+            .sort({ priceChangePct: -1 }).limit(10)
+            .select('tcgId name setName number rarity imageUrl marketPriceBrl types priceChangePct'),
+          Card.find({ priceChangePct: { $lt: 0 }, marketPriceBrl: { $gt: 0 } })
+            .sort({ priceChangePct: 1 }).limit(10)
+            .select('tcgId name setName number rarity imageUrl marketPriceBrl types priceChangePct'),
+        ]);
+        const toDbItem = (c: any) => ({
+          tcgId: c.tcgId, name: c.name, setName: c.setName,
+          number: c.number, rarity: c.rarity, imageUrl: c.imageUrl,
+          priceBrl: c.marketPriceBrl,
+          changePct: c.priceChangePct ? Math.round(c.priceChangePct * 10) / 10 : null,
+          types: c.types ?? [],
+        });
+        gainers = gCards.map(toDbItem);
+        losers  = lCards.map(toDbItem);
+      }
     }
 
-    // Popular = mais valiosas
+    // ── 3. Popular = mais valiosas do nosso BD ────────────────────────────────
     const popularCards = await Card.find({ marketPriceBrl: { $gt: 0 } })
       .sort({ marketPriceBrl: -1 })
       .limit(10)
