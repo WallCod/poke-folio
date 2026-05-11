@@ -1,6 +1,8 @@
 import { PublicHeader } from "@/components/PublicHeader";
-import { Shield, TrendingUp, Star, Layers, Zap, ArrowRight, ChevronDown, BookOpen, Sparkles } from "lucide-react";
+import { Shield, TrendingUp, Star, Layers, Zap, ArrowRight, ChevronDown, BookOpen, Sparkles, Crown } from "lucide-react";
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { getSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 const RAREZAS = [
@@ -58,6 +60,8 @@ const AccordionItem = ({ q, r }: { q: string; r: string }) => {
 };
 
 const GuiaTcg = () => {
+  const session = getSession();
+  const navigate = useNavigate();
   return (
     <div className="min-h-screen flex flex-col animate-fade-in">
       <PublicHeader />
@@ -161,7 +165,7 @@ const GuiaTcg = () => {
                 </button>
               ) : (
                 <Link
-                  to="/"
+                  to="/" state={{ openModal: "signup" }}
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-gold text-background font-semibold text-sm hover:opacity-90 hover:shadow-glow-gold transition-all"
                 >
                   Criar conta grátis <ArrowRight className="h-4 w-4" />

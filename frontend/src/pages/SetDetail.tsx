@@ -82,137 +82,195 @@ function mypSearchUrl(name: string, number: string): string {
 
 // ─── Card Detail Modal ────────────────────────────────────────────────────────
 
+interface CardPrices { floor: number | null; avg: number | null; max: number | null }
+
 function CardModal({
-  card,
-  owned,
-  loggedIn,
-  adding,
-  onAdd,
-  onClose,
-  onLoginRequired,
+  card, owned, loggedIn, adding, onAdd, onClose, onLoginRequired,
 }: {
-  card: SetCard;
-  owned: boolean;
-  loggedIn: boolean;
-  adding: boolean;
-  onAdd: (card: SetCard) => void;
-  onClose: () => void;
-  onLoginRequired: () => void;
+  card: SetCard; owned: boolean; loggedIn: boolean; adding: boolean;
+  onAdd: (card: SetCard) => void; onClose: () => void; onLoginRequired: () => void;
 }) {
   const [imgErr, setImgErr] = useState(false);
+  const [imgLarge, setImgLarge] = useState(false);
+  const [prices, setPrices] = useState<CardPrices | null>(null);
+  const [pricesLoading, setPricesLoading] = useState(true);
+
+  useEffect(() => {
+    setPricesLoading(true);
+    const baseUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3001/api").replace(/\/api$/, "");
+    fetch(`${baseUrl}/api/public/card-price/${encodeURIComponent(card.tcgId)}`)
+      .then((r) => r.json())
+      .then((d) => setPrices(d?.floor !== undefined ? d : null))
+      .catch(() => setPrices(null))
+      .finally(() => setPricesLoading(false));
+  }, [card.tcgId]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-background/85 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
+    <>
       <div
-        className="relative bg-card border border-border/70 rounded-2xl shadow-2xl w-full overflow-hidden flex flex-col sm:flex-row"
-        style={{ maxWidth: 520 }}
-        onClick={(e) => e.stopPropagation()}
+        className="fixed inset-0 z-50 bg-background/85 backdrop-blur-sm flex items-center justify-center p-4"
+        onClick={onClose}
       >
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 z-10 p-1.5 rounded-full bg-background/60 hover:bg-surface-elevated text-muted-foreground hover:text-foreground transition-colors"
+        <div
+          className="relative bg-card border border-border/70 rounded-2xl shadow-2xl w-full overflow-hidden flex flex-col sm:flex-row"
+          style={{ maxWidth: 520 }}
+          onClick={(e) => e.stopPropagation()}
         >
-          <X className="h-4 w-4" />
-        </button>
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 z-10 p-1.5 rounded-full bg-background/60 hover:bg-surface-elevated text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
 
-        {/* Imagem — coluna esquerda */}
-        <div className="sm:w-44 shrink-0 bg-card/60">
-          <div className="aspect-[2.5/3.5] relative">
-            {card.imageUrl && !imgErr ? (
-              <img
-                src={card.imageUrl}
-                alt={card.name}
-                className="w-full h-full object-contain"
-                onError={() => setImgErr(true)}
-              />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-4">
-                {card.types[0] && <EnergyIcon type={card.types[0]} size={40} />}
-                <span className="text-xs text-muted-foreground text-center">{card.name}</span>
-              </div>
-            )}
-            {owned && (
-              <div className="absolute top-2 left-2 flex items-center gap-1 bg-primary/90 text-background text-[10px] font-bold px-2 py-1 rounded-full">
-                <Check className="h-3 w-3" /> Tenho
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Info — coluna direita */}
-        <div className="flex-1 p-5 flex flex-col gap-4 min-w-0">
-          <div>
-            <h3 className="font-display font-bold text-xl leading-tight">{card.name}</h3>
-            <p className="text-sm text-muted-foreground mt-0.5">{card.setName} · #{card.number}</p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {card.rarity && (
-              <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-full border", rarityBadge(card.rarity))}>
-                {card.rarity}
-              </span>
-            )}
-            {card.supertype && card.supertype !== "Pokémon" && (
-              <span className="text-xs text-muted-foreground border border-border/50 px-2.5 py-1 rounded-full">{card.supertype}</span>
-            )}
-            {card.hp && (
-              <span className="text-xs text-muted-foreground border border-border/50 px-2.5 py-1 rounded-full">HP {card.hp}</span>
-            )}
-          </div>
-
-          {card.types.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
-              {card.types.map((t) => (
-                <span key={t} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <EnergyIcon type={t} size={14} /> {t}
-                </span>
-              ))}
-            </div>
-          )}
-
-          <div className="flex flex-col gap-2 mt-auto pt-2">
-            {loggedIn ? (
-              <Button
-                className={cn(
-                  "w-full font-semibold",
-                  owned
-                    ? "bg-primary/15 text-primary border border-primary/40 hover:bg-primary/25"
-                    : "bg-gradient-gold text-background hover:opacity-90"
-                )}
-                disabled={adding || owned}
-                onClick={() => !owned && onAdd(card)}
-              >
-                {adding ? (
-                  <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Adicionando...</>
-                ) : owned ? (
-                  <><Check className="h-4 w-4 mr-2" /> Já está na coleção</>
-                ) : (
-                  <><Plus className="h-4 w-4 mr-2" /> Adicionar à coleção</>
-                )}
-              </Button>
-            ) : (
-              <Button
-                className="w-full border border-border/60 bg-card hover:bg-surface-elevated"
-                onClick={onLoginRequired}
-              >
-                <Lock className="h-4 w-4 mr-2" /> Entrar para marcar
-              </Button>
-            )}
-            <a
-              href={mypSearchUrl(card.name, card.number)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+          {/* Imagem — coluna esquerda — clicável para lightbox */}
+          <div className="sm:w-44 shrink-0 bg-card/60">
+            <div
+              className="aspect-[2.5/3.5] relative cursor-zoom-in"
+              onClick={(e) => { e.stopPropagation(); setImgLarge(true); }}
+              title="Clique para ampliar"
             >
-              <ExternalLink className="h-3.5 w-3.5" /> Ver no MYP Cards
-            </a>
+              {card.imageUrl && !imgErr ? (
+                <img
+                  src={card.imageUrl}
+                  alt={card.name}
+                  className="w-full h-full object-contain"
+                  onError={() => setImgErr(true)}
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-4">
+                  {card.types[0] && <EnergyIcon type={card.types[0]} size={40} />}
+                  <span className="text-xs text-muted-foreground text-center">{card.name}</span>
+                </div>
+              )}
+              {owned && (
+                <div className="absolute top-2 left-2 flex items-center gap-1 bg-primary/90 text-background text-[10px] font-bold px-2 py-1 rounded-full">
+                  <Check className="h-3 w-3" /> Tenho
+                </div>
+              )}
+              {/* indicador zoom */}
+              <div className="absolute bottom-1.5 right-1.5 p-1 rounded bg-background/60 text-muted-foreground opacity-60">
+                <Star className="h-3 w-3" style={{ transform: "rotate(45deg)" }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Info — coluna direita */}
+          <div className="flex-1 p-5 flex flex-col gap-3 min-w-0 overflow-y-auto" style={{ maxHeight: "80vh" }}>
+            <div>
+              <h3 className="font-display font-bold text-xl leading-tight">{card.name}</h3>
+              <p className="text-sm text-muted-foreground mt-0.5">{card.setName} · #{card.number}</p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {card.rarity && (
+                <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-full border", rarityBadge(card.rarity))}>
+                  {card.rarity}
+                </span>
+              )}
+              {card.supertype && card.supertype !== "Pokémon" && (
+                <span className="text-xs text-muted-foreground border border-border/50 px-2.5 py-1 rounded-full">{card.supertype}</span>
+              )}
+              {card.hp && (
+                <span className="text-xs text-muted-foreground border border-border/50 px-2.5 py-1 rounded-full">HP {card.hp}</span>
+              )}
+            </div>
+
+            {card.types.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {card.types.map((t) => (
+                  <span key={t} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <EnergyIcon type={t} size={14} /> {t}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Preços MYP */}
+            <div className="rounded-xl border border-border/50 bg-surface-elevated/60 p-3 space-y-2">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Preço MYP Cards (BRL)</p>
+              {pricesLoading ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Buscando preços...
+                </div>
+              ) : prices && (prices.floor != null || prices.avg != null) ? (
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  {[
+                    { label: "Mínimo", val: prices.floor },
+                    { label: "Médio",  val: prices.avg },
+                    { label: "Máximo", val: prices.max },
+                  ].map(({ label, val }) => (
+                    <div key={label} className="space-y-0.5">
+                      <p className="text-[10px] text-muted-foreground">{label}</p>
+                      <p className="text-sm font-bold font-mono text-primary">
+                        {val != null ? `R$ ${val.toFixed(2)}` : "—"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Preço não disponível no MYP.</p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2 mt-auto pt-1">
+              {loggedIn ? (
+                <Button
+                  className={cn(
+                    "w-full font-semibold",
+                    owned
+                      ? "bg-primary/15 text-primary border border-primary/40 hover:bg-primary/25"
+                      : "bg-gradient-gold text-background hover:opacity-90"
+                  )}
+                  disabled={adding || owned}
+                  onClick={() => !owned && onAdd(card)}
+                >
+                  {adding ? (
+                    <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Adicionando...</>
+                  ) : owned ? (
+                    <><Check className="h-4 w-4 mr-2" /> Já está na coleção</>
+                  ) : (
+                    <><Plus className="h-4 w-4 mr-2" /> Adicionar à coleção</>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  className="w-full border border-border/60 bg-card hover:bg-surface-elevated"
+                  onClick={onLoginRequired}
+                >
+                  <Lock className="h-4 w-4 mr-2" /> Entrar para marcar
+                </Button>
+              )}
+              <a
+                href={mypSearchUrl(card.name, card.number)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 w-full px-4 py-2 rounded-md border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+              >
+                <ExternalLink className="h-3.5 w-3.5" /> Ver no MYP Cards
+              </a>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Lightbox */}
+      {imgLarge && (
+        <div
+          className="fixed inset-0 z-[60] bg-background/96 flex items-center justify-center p-8 cursor-zoom-out"
+          onClick={() => setImgLarge(false)}
+        >
+          {card.imageUrl && (
+            <img
+              src={card.imageUrl.replace("/small/", "/large/")}
+              alt={card.name}
+              className="max-h-full max-w-sm rounded-2xl shadow-2xl"
+              onError={(e) => { (e.target as HTMLImageElement).src = card.imageUrl; }}
+            />
+          )}
+        </div>
+      )}
+    </>
   );
 }
 

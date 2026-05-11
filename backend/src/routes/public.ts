@@ -157,6 +157,77 @@ router.get('/sets/:setId/cards', async (req: Request, res: Response) => {
   }
 });
 
+// ─── GET /api/public/card-price/:tcgId ───────────────────────────────────────
+// Retorna preços MYP (floor/avg/max) para uma carta específica.
+// Primeiro tenta o BD; se não tiver preço salvo, chama MYP ao vivo.
+
+const cardPriceCache: Record<string, { data: any; at: number }> = {};
+const CARD_PRICE_TTL = 15 * 60 * 1000; // 15min
+
+router.get('/card-price/:tcgId', async (req: Request, res: Response) => {
+  const { tcgId } = req.params;
+  const cacheKey = tcgId;
+
+  if (cardPriceCache[cacheKey] && Date.now() - cardPriceCache[cacheKey].at < CARD_PRICE_TTL) {
+    res.json(cardPriceCache[cacheKey].data);
+    return;
+  }
+
+  try {
+    const card = await Card.findOne({ tcgId })
+      .select('name number setCode marketPriceBrl marketPriceBrlMin marketPriceBrlMax priceSource');
+
+    if (card && card.marketPriceBrl != null && card.priceSource === 'mypcards') {
+      const result = {
+        floor: card.marketPriceBrlMin ?? card.marketPriceBrl,
+        avg:   card.marketPriceBrl,
+        max:   card.marketPriceBrlMax,
+      };
+      cardPriceCache[cacheKey] = { data: result, at: Date.now() };
+      res.json(result);
+      return;
+    }
+
+    // Se não tem no BD ou não é mypcards, tenta MYP ao vivo
+    if (card?.name && card?.number) {
+      const axios2 = (await import('axios')).default;
+      const cleaned = card.name
+        .replace(/^(mega|dark|light|shadow|m\s+)\s+/i, '')
+        .replace(/\s+(ex|gx|v|vmax|vstar|prime)\s*$/i, '')
+        .trim();
+      const slug = cleaned.toLowerCase().split(' ')[0];
+
+      const { data: mypData } = await axios2.get(
+        `https://mypcards.com/api/v1/pokemon/carta/${encodeURIComponent(slug)}`,
+        { timeout: 6000 }
+      );
+      const cards = (mypData.cards as any[]) ?? [];
+      const num = card.number.replace(/[^0-9]/g, '');
+      const match = cards.find((c: any) => {
+        const parts = c.card_code.split('_');
+        const numPart = (parts[parts.length - 1]?.split('/')[0] ?? '').replace(/^0+/, '');
+        return numPart === num.replace(/^0+/, '');
+      }) ?? null;
+
+      if (match) {
+        const result = {
+          floor: match.min_price ? parseFloat(match.min_price) : null,
+          avg:   match.avg_price ? parseFloat(match.avg_price) : null,
+          max:   match.max_price ? parseFloat(match.max_price) : null,
+        };
+        cardPriceCache[cacheKey] = { data: result, at: Date.now() };
+        res.json(result);
+        return;
+      }
+    }
+
+    res.json({ floor: null, avg: null, max: null });
+  } catch (err: any) {
+    console.warn(`[public/card-price/${tcgId}] erro: ${err?.message ?? err}`);
+    res.json({ floor: null, avg: null, max: null });
+  }
+});
+
 // ─── GET /api/public/top ─────────────────────────────────────────────────────
 
 router.get('/top', async (_req: Request, res: Response) => {

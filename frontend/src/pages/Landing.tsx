@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Sparkles, Shield, TrendingUp, TrendingDown, ArrowRight, Check,
-  Zap, Crown, Loader2, Eye, EyeOff, CheckCircle2, Star,
+  Zap, Crown, Loader2, Eye, EyeOff, CheckCircle2, Star, X, ExternalLink,
 } from "lucide-react";
 import heroImage from "@/assets/hero-cards.jpg";
 import { EnergyIcon } from "@/components/EnergyIcon";
@@ -113,15 +113,116 @@ interface TrendCard {
   changePct?: number | null; types?: string[];
 }
 
-function TrendCardItem({ card, rank }: { card: TrendCard; rank?: number }) {
+// ─── Modal de detalhe do mercado ──────────────────────────────────────────────
+
+function MarketModal({ card, onClose }: { card: TrendCard; onClose: () => void }) {
+  const [imgErr, setImgErr] = useState(false);
+  const [imgLarge, setImgLarge] = useState(false);
+  const isUp = (card.changePct ?? 0) > 0;
+  const typeColor = TYPE_COLORS[card.types?.[0] ?? "Colorless"] ?? TYPE_COLORS.Colorless;
+  const mypUrl = `https://www.mypcards.com/cartas/pokemon?busca=${encodeURIComponent(card.name)}`;
+
+  // Análise de mercado gerada localmente com base nos dados disponíveis
+  const insight = (() => {
+    const pct = card.changePct ?? 0;
+    const price = card.priceBrl ?? 0;
+    if (pct > 30) return { label: "Alta demanda", color: "text-green-400", desc: `Valorizou ${pct.toFixed(1)}% recentemente. Pode ser resultado de novos sets, torneios ou escassez de estoque. Boa janela para venda.` };
+    if (pct > 10) return { label: "Em alta", color: "text-green-400", desc: `Alta consistente de ${pct.toFixed(1)}%. Indicativo de interesse crescente. Monitorar para confirmar tendência.` };
+    if (pct < -20) return { label: "Queda expressiva", color: "text-red-400", desc: `Desvalorizou ${Math.abs(pct).toFixed(1)}%. Pode ser reprint ou excesso de oferta. Avaliar antes de comprar.` };
+    if (pct < -5) return { label: "Leve baixa", color: "text-orange-400", desc: `Recuou ${Math.abs(pct).toFixed(1)}%. Possível oportunidade de entrada a preço mais baixo se os fundamentos da carta forem fortes.` };
+    if (price > 500) return { label: "Alto valor", color: "text-yellow-400", desc: `Carta de alta cotação (R$${price.toFixed(2)}). Alta raridade ou demanda de colecionadores. Mercado relativamente estável.` };
+    return { label: "Estável", color: "text-muted-foreground", desc: "Variação pequena no período. Carta estável no mercado atual." };
+  })();
+
+  return (
+    <div className="fixed inset-0 z-50 bg-background/85 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="relative bg-card border border-border/70 rounded-2xl shadow-2xl w-full max-w-[480px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-3 right-3 z-10 p-1.5 rounded-full bg-background/60 hover:bg-surface-elevated text-muted-foreground hover:text-foreground transition-colors">
+          <X className="h-4 w-4" />
+        </button>
+
+        {/* Header com tipo */}
+        <div className={cn("px-5 pt-5 pb-4 border-b border-border/40", typeColor.bg)}>
+          <div className="flex items-start gap-4">
+            {/* Imagem clicável */}
+            <div className="h-20 w-14 rounded-lg overflow-hidden border border-border/50 shrink-0 cursor-zoom-in" onClick={() => setImgLarge(true)}>
+              {card.imageUrl && !imgErr
+                ? <img src={card.imageUrl} alt={card.name} className="h-full w-full object-cover" onError={() => setImgErr(true)} />
+                : <div className={cn("h-full w-full flex items-center justify-center", typeColor.bg)}><CardDecor className={cn("w-6", typeColor.text)} /></div>
+              }
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-display font-bold text-lg leading-tight">{card.name}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{card.setName}{card.number ? ` · #${card.number}` : ""}</p>
+              {card.rarity && (
+                <span className="inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-background/40 border border-border/50 text-muted-foreground">
+                  {card.rarity}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Métricas */}
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-xl bg-surface-elevated border border-border/50">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Preço atual</p>
+              <p className="font-display font-bold text-xl text-primary">
+                {card.priceBrl != null ? `R$ ${card.priceBrl.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+              </p>
+            </div>
+            <div className={cn("p-3 rounded-xl border", isUp ? "bg-green-500/8 border-green-500/30" : "bg-red-500/8 border-red-500/30")}>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Variação</p>
+              <p className={cn("font-display font-bold text-xl flex items-center gap-1", isUp ? "text-green-400" : "text-red-400")}>
+                {isUp ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                {card.changePct != null ? `${isUp ? "+" : ""}${card.changePct.toFixed(1)}%` : "—"}
+              </p>
+            </div>
+          </div>
+
+          {/* Insight */}
+          <div className="p-3 rounded-xl bg-surface-elevated/60 border border-border/40">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Análise de mercado</p>
+            <p className={cn("text-xs font-semibold mb-1", insight.color)}>{insight.label}</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">{insight.desc}</p>
+          </div>
+
+          {card.types && card.types.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              {card.types.map((t) => <TypeBadge key={t} type={t} />)}
+            </div>
+          )}
+
+          <a href={mypUrl} target="_blank" rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-primary/5 transition-colors">
+            <ExternalLink className="h-3.5 w-3.5" /> Ver no MYP Cards
+          </a>
+        </div>
+      </div>
+
+      {/* Lightbox da imagem */}
+      {imgLarge && (
+        <div className="fixed inset-0 z-[60] bg-background/95 flex items-center justify-center p-8 cursor-zoom-out" onClick={() => setImgLarge(false)}>
+          {card.imageUrl && <img src={card.imageUrl} alt={card.name} className="max-h-full max-w-xs rounded-2xl shadow-2xl" />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrendCardItem({ card, rank, onClick }: { card: TrendCard; rank?: number; onClick: () => void }) {
   const [imgErr, setImgErr] = useState(false);
   const isUp = (card.changePct ?? 0) > 0;
   const typeColor = TYPE_COLORS[card.types?.[0] ?? "Colorless"] ?? TYPE_COLORS.Colorless;
   return (
-    <div className={cn(
-      "relative flex items-center gap-3 p-3 rounded-xl border bg-card/60 backdrop-blur transition-all duration-200 hover:bg-card/90 group",
-      typeColor.border, typeColor.glow,
-    )}>
+    <div
+      className={cn(
+        "relative flex items-center gap-3 p-3 rounded-xl border bg-card/60 backdrop-blur transition-all duration-200 hover:bg-card/90 cursor-pointer group",
+        typeColor.border, typeColor.glow,
+      )}
+      onClick={onClick}
+    >
       {rank !== undefined && (
         <span className="absolute -top-2 -left-2 h-5 w-5 rounded-full bg-background border border-border text-[10px] font-bold text-muted-foreground flex items-center justify-center">
           {rank}
@@ -151,19 +252,22 @@ function TrendCardItem({ card, rank }: { card: TrendCard; rank?: number }) {
             {isUp ? "+" : ""}{card.changePct.toFixed(1)}%
           </p>
         )}
+        <span className="text-[9px] text-muted-foreground/50 group-hover:text-muted-foreground transition-colors">ver detalhes →</span>
       </div>
     </div>
   );
 }
 
-// ─── Top card (raras da plataforma) ──────────────────────────────────────────
+// ─── Top card (mais caras do mercado global) ──────────────────────────────────
 
-function TopCardItem({ card }: { card: TrendCard }) {
+function TopCardItem({ card, onClick }: { card: TrendCard; onClick: () => void }) {
   const [imgErr, setImgErr] = useState(false);
   const [hov, setHov] = useState(false);
+  const isUp = (card.changePct ?? 0) > 0;
   return (
     <div
       className="holo-card relative aspect-[2.5/3.5] rounded-xl border border-border/40 overflow-hidden cursor-pointer"
+      onClick={onClick}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       onMouseMove={(e) => {
@@ -189,6 +293,12 @@ function TopCardItem({ card }: { card: TrendCard }) {
         <p className="text-[10px] text-muted-foreground">{card.setName}</p>
         {card.priceBrl != null && (
           <p className="text-primary font-bold text-xs mt-1">R$ {card.priceBrl.toFixed(2)}</p>
+        )}
+        {card.changePct != null && (
+          <p className={cn("text-[10px] font-semibold flex items-center gap-0.5 mt-0.5", isUp ? "text-green-400" : "text-red-400")}>
+            {isUp ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
+            {isUp ? "+" : ""}{card.changePct.toFixed(1)}%
+          </p>
         )}
       </div>
     </div>
@@ -276,6 +386,7 @@ const Landing = () => {
   const [trendLoading, setTrendLoading] = useState(true);
 
   const [topCards, setTopCards] = useState<TrendCard[]>([]);
+  const [marketModal, setMarketModal] = useState<TrendCard | null>(null);
 
   if (urlResetToken) window.history.replaceState({}, "", window.location.pathname);
 
@@ -526,7 +637,7 @@ const Landing = () => {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {trendCards.slice(0, 10).map((card, i) => (
-                <TrendCardItem key={card.tcgId} card={card} rank={i + 1} />
+                <TrendCardItem key={card.tcgId} card={card} rank={i + 1} onClick={() => setMarketModal(card)} />
               ))}
             </div>
           )}
@@ -541,14 +652,12 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ── Seção: Top cartas da plataforma (substitui mockup) ── */}
+      {/* ── Seção: Top cartas mais caras do mercado global ── */}
       {topCards.length > 0 && (
         <section className="container pb-16 border-t border-border/30 pt-14 relative overflow-hidden">
-          {/* Textura diagonal sutil */}
           <div className="absolute inset-0 -z-10 pointer-events-none"
             style={{ backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 40px, hsl(271 91% 73% / 0.012) 40px, hsl(271 91% 73% / 0.012) 41px)" }}
           />
-          {/* Ultra Ball decorativa */}
           <svg className="absolute -left-16 bottom-0 w-52 opacity-[0.04] text-[#4169E1] pointer-events-none" viewBox="0 0 200 200">
             <circle cx="100" cy="100" r="90" fill="none" stroke="currentColor" strokeWidth="3"/>
             <path d="M10,100 A90,90 0 0,1 190,100" fill="currentColor" fillOpacity="0.45"/>
@@ -560,22 +669,22 @@ const Landing = () => {
             <div className="text-center mb-8">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/30 text-xs text-primary font-semibold mb-4">
                 <Crown className="h-3.5 w-3.5" />
-                Top cartas da plataforma
+                Mercado global · Top 10
               </div>
-              <h2 className="font-display text-2xl font-bold">As mais raras do Pokéfolio</h2>
-              <p className="text-muted-foreground text-sm mt-2">Cartas reais catalogadas pelos treinadores — passe o mouse para ver detalhes</p>
+              <h2 className="font-display text-2xl font-bold">Cartas mais caras do mercado</h2>
+              <p className="text-muted-foreground text-sm mt-2">Ranking por valor de mercado em BRL — clique para ver detalhes e análise</p>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
               {topCards.slice(0, 10).map((card) => (
-                <TopCardItem key={card.tcgId} card={card} />
+                <TopCardItem key={card.tcgId} card={card} onClick={() => setMarketModal(card)} />
               ))}
             </div>
 
             <div className="text-center mt-8">
-              <Button onClick={() => session ? navigate("/catalog") : setOpen("signup")}
+              <Button onClick={() => session ? navigate("/prices") : setOpen("signup")}
                 className="bg-gradient-gold text-background font-semibold hover:opacity-90 hover:shadow-glow-gold">
-                {session ? "Explorar catálogo completo" : "Criar conta e catalogar suas cartas"}
+                {session ? "Ver todos os preços" : "Criar conta para acompanhar"}
                 <ArrowRight className="h-4 w-4 ml-1.5" />
               </Button>
             </div>
@@ -834,6 +943,9 @@ const Landing = () => {
 
         </DialogContent>
       </Dialog>
+
+      {/* ── Modal de detalhe de mercado ── */}
+      {marketModal && <MarketModal card={marketModal} onClose={() => setMarketModal(null)} />}
     </div>
   );
 };
