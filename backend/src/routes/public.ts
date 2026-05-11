@@ -8,9 +8,30 @@ const router = Router();
 const TCG_KEY = process.env.POKEMONTCG_API_KEY ?? '';
 const tcgClient = axios.create({
   baseURL: 'https://api.pokemontcg.io/v2',
-  timeout: 15000,
+  timeout: 8000,
   headers: TCG_KEY ? { 'X-Api-Key': TCG_KEY } : {},
 });
+
+// Sets estáticos de fallback (usados quando a API pokemontcg.io está inacessível)
+const FALLBACK_SETS = [
+  { id: 'sv8pt5', name: 'Prismatic Evolutions', series: 'Scarlet & Violet', releaseDate: '2025-01-17', total: 147, printedTotal: 147, logo: 'https://images.pokemontcg.io/sv8pt5/logo.png', symbol: 'https://images.pokemontcg.io/sv8pt5/symbol.png' },
+  { id: 'sv8',    name: 'Surging Sparks',       series: 'Scarlet & Violet', releaseDate: '2024-11-08', total: 264, printedTotal: 191, logo: 'https://images.pokemontcg.io/sv8/logo.png',    symbol: 'https://images.pokemontcg.io/sv8/symbol.png' },
+  { id: 'sv7',    name: 'Stellar Crown',        series: 'Scarlet & Violet', releaseDate: '2024-09-13', total: 175, printedTotal: 142, logo: 'https://images.pokemontcg.io/sv7/logo.png',    symbol: 'https://images.pokemontcg.io/sv7/symbol.png' },
+  { id: 'sv6pt5', name: 'Shrouded Fable',       series: 'Scarlet & Violet', releaseDate: '2024-08-02', total: 99,  printedTotal: 99,  logo: 'https://images.pokemontcg.io/sv6pt5/logo.png', symbol: 'https://images.pokemontcg.io/sv6pt5/symbol.png' },
+  { id: 'sv6',    name: 'Twilight Masquerade',  series: 'Scarlet & Violet', releaseDate: '2024-05-24', total: 226, printedTotal: 167, logo: 'https://images.pokemontcg.io/sv6/logo.png',    symbol: 'https://images.pokemontcg.io/sv6/symbol.png' },
+  { id: 'sv5',    name: 'Temporal Forces',      series: 'Scarlet & Violet', releaseDate: '2024-03-22', total: 218, printedTotal: 162, logo: 'https://images.pokemontcg.io/sv5/logo.png',    symbol: 'https://images.pokemontcg.io/sv5/symbol.png' },
+  { id: 'sv4pt5', name: 'Paldean Fates',        series: 'Scarlet & Violet', releaseDate: '2024-01-26', total: 245, printedTotal: 245, logo: 'https://images.pokemontcg.io/sv4pt5/logo.png', symbol: 'https://images.pokemontcg.io/sv4pt5/symbol.png' },
+  { id: 'sv4',    name: 'Paradox Rift',         series: 'Scarlet & Violet', releaseDate: '2023-11-03', total: 266, printedTotal: 182, logo: 'https://images.pokemontcg.io/sv4/logo.png',    symbol: 'https://images.pokemontcg.io/sv4/symbol.png' },
+  { id: 'sv3pt5', name: 'Pokemon 151',          series: 'Scarlet & Violet', releaseDate: '2023-09-22', total: 207, printedTotal: 165, logo: 'https://images.pokemontcg.io/sv3pt5/logo.png', symbol: 'https://images.pokemontcg.io/sv3pt5/symbol.png' },
+  { id: 'sv3',    name: 'Obsidian Flames',      series: 'Scarlet & Violet', releaseDate: '2023-08-11', total: 230, printedTotal: 197, logo: 'https://images.pokemontcg.io/sv3/logo.png',    symbol: 'https://images.pokemontcg.io/sv3/symbol.png' },
+  { id: 'sv2',    name: 'Paldea Evolved',       series: 'Scarlet & Violet', releaseDate: '2023-06-09', total: 279, printedTotal: 193, logo: 'https://images.pokemontcg.io/sv2/logo.png',    symbol: 'https://images.pokemontcg.io/sv2/symbol.png' },
+  { id: 'sv1',    name: 'Scarlet & Violet',     series: 'Scarlet & Violet', releaseDate: '2023-03-31', total: 258, printedTotal: 198, logo: 'https://images.pokemontcg.io/sv1/logo.png',    symbol: 'https://images.pokemontcg.io/sv1/symbol.png' },
+  { id: 'swsh12', name: 'Silver Tempest',       series: 'Sword & Shield',   releaseDate: '2022-11-11', total: 245, printedTotal: 195, logo: 'https://images.pokemontcg.io/swsh12/logo.png', symbol: 'https://images.pokemontcg.io/swsh12/symbol.png' },
+  { id: 'swsh11', name: 'Lost Origin',          series: 'Sword & Shield',   releaseDate: '2022-09-09', total: 246, printedTotal: 196, logo: 'https://images.pokemontcg.io/swsh11/logo.png', symbol: 'https://images.pokemontcg.io/swsh11/symbol.png' },
+  { id: 'swsh10', name: 'Pokémon GO',           series: 'Sword & Shield',   releaseDate: '2022-07-01', total: 88,  printedTotal: 78,  logo: 'https://images.pokemontcg.io/swsh10pt5/logo.png', symbol: 'https://images.pokemontcg.io/swsh10pt5/symbol.png' },
+  { id: 'swsh9',  name: 'Brilliant Stars',      series: 'Sword & Shield',   releaseDate: '2022-02-25', total: 216, printedTotal: 172, logo: 'https://images.pokemontcg.io/swsh9/logo.png',  symbol: 'https://images.pokemontcg.io/swsh9/symbol.png' },
+  { id: 'base1',  name: 'Base Set',             series: 'Base',             releaseDate: '1999-01-09', total: 102, printedTotal: 102, logo: 'https://images.pokemontcg.io/base1/logo.png',  symbol: 'https://images.pokemontcg.io/base1/symbol.png' },
+];
 
 // ─── Caches em memória ─────────────────────────────────────────────────────────
 
@@ -54,12 +75,12 @@ async function getUsdBrlRate(): Promise<number> {
 // ─── GET /api/public/sets ─────────────────────────────────────────────────────
 
 router.get('/sets', async (_req: Request, res: Response) => {
-  try {
-    if (setsCache && Date.now() - setsCache.at < SETS_TTL) {
-      res.json(setsCache.data);
-      return;
-    }
+  if (setsCache && Date.now() - setsCache.at < SETS_TTL) {
+    res.json(setsCache.data);
+    return;
+  }
 
+  try {
     const { data } = await tcgClient.get('/sets', {
       params: { orderBy: '-releaseDate', pageSize: 250 },
     });
@@ -77,9 +98,10 @@ router.get('/sets', async (_req: Request, res: Response) => {
 
     setsCache = { data: sets, at: Date.now() };
     res.json(sets);
-  } catch (err) {
-    console.error('[public/sets] erro:', err);
-    res.status(502).json({ error: 'Não foi possível carregar os sets.' });
+  } catch (err: any) {
+    const msg = err?.code ?? err?.message ?? 'erro desconhecido';
+    console.warn(`[public/sets] API indisponível (${msg}), usando fallback estático.`);
+    res.json(FALLBACK_SETS);
   }
 });
 
@@ -128,9 +150,10 @@ router.get('/sets/:setId/cards', async (req: Request, res: Response) => {
 
     setCardsCache[setId] = { data: result, at: Date.now() };
     res.json(result);
-  } catch (err) {
-    console.error(`[public/sets/${setId}/cards] erro:`, err);
-    res.status(502).json({ error: 'Não foi possível carregar as cartas do set.' });
+  } catch (err: any) {
+    const msg = err?.code ?? err?.message ?? 'erro desconhecido';
+    console.warn(`[public/sets/${setId}/cards] API indisponível (${msg}).`);
+    res.status(502).json({ error: 'Não foi possível carregar as cartas do set. A API externa está inacessível.' });
   }
 });
 
@@ -302,8 +325,9 @@ router.get('/trending', async (req: Request, res: Response) => {
             .filter(Boolean)
             .slice(0, 10);
         }
-      } catch (tcgErr) {
-        console.warn('[trending] fallback TCG API falhou:', tcgErr);
+      } catch (tcgErr: any) {
+        const tcgMsg = tcgErr?.code ?? tcgErr?.message ?? 'erro';
+        console.warn(`[trending] fallback TCG API indisponível (${tcgMsg}), usando BD.`);
         // Se tudo falhou, usa priceChangePct do BD
         const [gCards, lCards] = await Promise.all([
           Card.find({ priceChangePct: { $gt: 0 }, marketPriceBrl: { $gt: 0 } })
