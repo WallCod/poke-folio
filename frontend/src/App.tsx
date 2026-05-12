@@ -62,8 +62,8 @@ const App = () => (
       <Sonner position="bottom-left" />
       <AppModal />
       <GlobalBackground />
-      <AuthModal />
       <BrowserRouter>
+        <AuthModal />
         <ScrollToTop />
         <PageTransition>
         <Routes>
