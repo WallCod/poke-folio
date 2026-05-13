@@ -78,7 +78,7 @@ function rarityBadge(rarity: string): string {
 
 // ─── Card Detail Modal ────────────────────────────────────────────────────────
 
-interface CardPrices { floor: number | null; avg: number | null; max: number | null }
+interface CardPrices { floor: number | null; avg: number | null; max: number | null; link?: string | null; source?: string | null }
 
 function CardModal({
   card, owned, loggedIn, adding, onAdd, onClose, onLoginRequired,
@@ -185,7 +185,16 @@ function CardModal({
 
             {/* Preços BRL */}
             <div className="rounded-xl border border-border/50 bg-surface-elevated/60 p-3 space-y-2">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Preço de mercado (BRL)</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                  Preço de mercado (BRL)
+                </p>
+                {prices?.source && (
+                  <span className="text-[9px] text-muted-foreground/60 uppercase tracking-wider">
+                    via {prices.source === "tcgplayer" ? "TCGPlayer" : "MYP"}
+                  </span>
+                )}
+              </div>
               {pricesLoading ? (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" /> Buscando preços...
@@ -200,13 +209,25 @@ function CardModal({
                     <div key={label} className="space-y-0.5">
                       <p className="text-[10px] text-muted-foreground">{label}</p>
                       <p className="text-sm font-bold font-mono text-primary">
-                        {val != null ? `R$ ${val.toFixed(2)}` : "—"}
+                        {val != null
+                          ? `R$ ${val.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : "—"}
                       </p>
                     </div>
                   ))}
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground">Preço não disponível.</p>
+              )}
+              {prices?.link && (
+                <a
+                  href={prices.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-center text-[11px] text-primary/70 hover:text-primary transition-colors pt-1"
+                >
+                  Ver listagens →
+                </a>
               )}
             </div>
 

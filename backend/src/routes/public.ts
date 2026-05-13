@@ -76,7 +76,9 @@ async function getUsdBrlRate(): Promise<number> {
 router.get('/cache-purge', (_req: Request, res: Response) => {
   trendingCache = null;
   topCardsCache = null;
-  res.json({ ok: true, msg: 'trending + top cache cleared' });
+  Object.keys(cardPriceCache).forEach((k) => delete cardPriceCache[k]);
+  Object.keys(setCardsCache).forEach((k) => delete setCardsCache[k]);
+  res.json({ ok: true, msg: 'all caches cleared' });
 });
 
 // ─── GET /api/public/sets ─────────────────────────────────────────────────────
@@ -292,20 +294,7 @@ function pickBestCard(cards: any[], mypEdition: string | undefined, numClean: st
   );
   if (byNumAny.length > 0) return byNumAny[0];
 
-  // 4. Para trainers sem número correspondente: EN mais recente com preço
-  const anyEn = cards
-    .filter((c) => c.min_price != null && EN_EDITIONS_SET.has(c.edition_code?.toUpperCase()))
-    .sort((a, b) => {
-      const ai = EN_EDITIONS_ORDERED.indexOf(a.edition_code?.toUpperCase());
-      const bi = EN_EDITIONS_ORDERED.indexOf(b.edition_code?.toUpperCase());
-      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-    });
-  if (anyEn.length > 0) return anyEn[0];
-
-  // 5. Último recurso: qualquer card com preço (inclui JP/promo) — melhor que null
-  const anyWithPrice = cards.filter((c) => c.min_price != null);
-  if (anyWithPrice.length > 0) return anyWithPrice[0];
-
+  // Sem correspondência por número — não retorna carta errada
   return null;
 }
 
@@ -334,11 +323,48 @@ async function fetchMypPrice(name: string, number: string, tcgId?: string): Prom
   };
 }
 
+// Busca preço do TCGPlayer como fallback quando a MYP não tem o card
+async function fetchTcgPrice(tcgId: string): Promise<{ floor: number | null; avg: number | null; max: number | null; link: string | null; qty: number | null; source: string }> {
+  try {
+    const rate = await getUsdBrlRate();
+    const { data } = await tcgClient.get(`/cards/${tcgId}`, {
+      params: { select: 'id,tcgplayer' },
+    });
+    const p = data?.data?.tcgplayer?.prices;
+    const url = data?.data?.tcgplayer?.url ?? null;
+    if (!p) return { floor: null, avg: null, max: null, link: null, qty: null, source: 'tcgplayer' };
+
+    const tier = p.holofoil ?? p['1stEditionHolofoil'] ?? p.ultraHolofoil ?? p.reverseHolofoil ?? p.normal ?? null;
+    if (!tier) return { floor: null, avg: null, max: null, link: null, qty: null, source: 'tcgplayer' };
+
+    const brl = (v: number | null | undefined) => v != null ? Math.round(v * rate * 100) / 100 : null;
+    const market = tier.market as number | null;
+    const mid    = tier.mid    as number | null;
+    const low    = tier.low    as number | null;
+    const high   = tier.high   as number | null;
+
+    // low/high do TCGPlayer frequentemente têm outliers ($0.01 a $9999).
+    // Só usa se estiver dentro de 10x do market.
+    const safeFloor = low  != null && market != null && low  >= market / 10 ? brl(low)  : null;
+    const safeCeil  = high != null && market != null && high <= market * 10  ? brl(high) : null;
+
+    return {
+      floor: safeFloor,
+      avg:   brl(market ?? mid),
+      max:   safeCeil,
+      link:  url,
+      qty:   null,
+      source: 'tcgplayer',
+    };
+  } catch {
+    return { floor: null, avg: null, max: null, link: null, qty: null, source: 'tcgplayer' };
+  }
+}
+
 router.get('/card-price/:tcgId', async (req: Request, res: Response) => {
   const { tcgId } = req.params;
   const { name, number } = req.query as { name?: string; number?: string };
 
-  // Cache key inclui name+number para evitar servir resultado vazio (sem params) para requisições com params
   const cacheKey = name && number ? `${tcgId}|${name}|${number}` : tcgId;
   if (cardPriceCache[cacheKey] && Date.now() - cardPriceCache[cacheKey].at < CARD_PRICE_TTL) {
     res.json(cardPriceCache[cacheKey].data);
@@ -346,23 +372,24 @@ router.get('/card-price/:tcgId', async (req: Request, res: Response) => {
   }
 
   try {
+    let result: any = { floor: null, avg: null, max: null, link: null, qty: null };
+
     if (name && number) {
-      const result = await fetchMypPrice(name, number, tcgId);
-      cardPriceCache[cacheKey] = { data: result, at: Date.now() };
-      res.json(result);
-      return;
+      result = await fetchMypPrice(name, number, tcgId);
+    } else {
+      const card = await Card.findOne({ tcgId }).select('name number');
+      if (card?.name && card?.number) {
+        result = await fetchMypPrice(card.name, card.number, tcgId);
+      }
     }
 
-    // Fallback: tenta pegar name+number do BD
-    const card = await Card.findOne({ tcgId }).select('name number');
-    if (card?.name && card?.number) {
-      const result = await fetchMypPrice(card.name, card.number, tcgId);
-      cardPriceCache[cacheKey] = { data: result, at: Date.now() };
-      res.json(result);
-      return;
+    // MYP não tem esse card — usa TCGPlayer convertido para BRL
+    if (result.floor == null && result.avg == null) {
+      result = await fetchTcgPrice(tcgId);
     }
 
-    res.json({ floor: null, avg: null, max: null });
+    cardPriceCache[cacheKey] = { data: result, at: Date.now() };
+    res.json(result);
   } catch (err: any) {
     console.warn(`[public/card-price/${tcgId}] erro: ${err?.message ?? err}`);
     res.json({ floor: null, avg: null, max: null });
