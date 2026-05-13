@@ -111,7 +111,7 @@ function CardModal({
   card, owned, loggedIn, adding, onAdd, onClose, onLoginRequired,
 }: {
   card: SetCard; owned: boolean; loggedIn: boolean; adding: boolean;
-  onAdd: (card: SetCard) => void; onClose: () => void; onLoginRequired: () => void;
+  onAdd: (card: SetCard, floorPrice?: number | null) => void; onClose: () => void; onLoginRequired: () => void;
 }) {
   const [imgErr, setImgErr] = useState(false);
   const [imgLarge, setImgLarge] = useState(false);
@@ -119,8 +119,13 @@ function CardModal({
   const [pricesLoading, setPricesLoading] = useState(true);
 
   const typeColor = TYPE_COLORS[card.types[0] ?? "Colorless"] ?? TYPE_COLORS.Colorless;
-  // TCG API: small = "3.png", large = "3_hires.png"
-  const largeImg = card.imageUrl ? card.imageUrl.replace(/\.png$/, "_hires.png") : "";
+  // pokemontcg.io: "3.png" → "3_hires.png"
+  // scrydex.com:   ".../small" → ".../large"
+  const largeImg = card.imageUrl
+    ? card.imageUrl.includes("scrydex.com")
+      ? card.imageUrl.replace(/\/small$/, "/large")
+      : card.imageUrl.replace(/\.png$/, "_hires.png")
+    : "";
 
   useEffect(() => {
     setPricesLoading(true);
@@ -213,7 +218,7 @@ function CardModal({
             {/* Preços */}
             <div className="flex-1 p-4 space-y-3">
 
-              {/* MYP — mercado nacional */}
+              {/* MYP — mercado nacional: floor em destaque */}
               <div className="rounded-xl border border-border/50 overflow-hidden">
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-elevated border-b border-border/40">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Mercado Pokémon BR</p>
@@ -226,25 +231,28 @@ function CardModal({
                   </div>
                 ) : prices && isMYP && (prices.floor != null || prices.avg != null) ? (
                   <>
-                    {mypSparse ? (
-                      <div className="px-3 py-2.5 text-center">
-                        <p className="text-[10px] text-yellow-400/80 uppercase tracking-wider mb-0.5">Listagem única</p>
-                        <p className="text-sm font-bold text-primary">{fmtBrl(prices.avg)}</p>
+                    <div className="px-4 py-3 flex items-end justify-between gap-3">
+                      {/* Floor — menor listagem ativa agora */}
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">
+                          {mypSparse ? "Listagem única" : "Floor price"}
+                        </p>
+                        <p className="text-xl font-bold font-display text-primary leading-none">
+                          {fmtBrl(prices.floor ?? prices.avg)}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">menor oferta ativa</p>
                       </div>
-                    ) : (
-                      <div className="grid grid-cols-3 divide-x divide-border/40">
-                        {[
-                          { label: "Mínimo", val: prices.floor },
-                          { label: "Médio",  val: prices.avg   },
-                          { label: "Máximo", val: prices.max   },
-                        ].map(({ label, val }) => (
-                          <div key={label} className="p-2 text-center">
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">{label}</p>
-                            <p className="text-xs font-bold text-primary">{fmtBrl(val)}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                      {/* Média — referência secundária */}
+                      {!mypSparse && prices.avg != null && (
+                        <div className="text-right">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Médio</p>
+                          <p className="text-sm font-semibold text-muted-foreground">{fmtBrl(prices.avg)}</p>
+                          {prices.qty != null && (
+                            <p className="text-[10px] text-muted-foreground">{prices.qty} disponíve{prices.qty > 1 ? "is" : "l"}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     {prices.link && (
                       <a href={prices.link} target="_blank" rel="noopener noreferrer"
                         className="flex items-center justify-center gap-1 w-full py-1.5 border-t border-border/40 text-[11px] text-muted-foreground hover:text-foreground hover:bg-primary/5 transition-all">
@@ -257,23 +265,24 @@ function CardModal({
                 )}
               </div>
 
-              {/* TCGPlayer fallback */}
+              {/* TCGPlayer — só aparece quando MYP não tem listagem */}
               {!pricesLoading && prices && !isMYP && (prices.floor != null || prices.avg != null) && (
                 <div className="rounded-xl border border-border/50 overflow-hidden">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-3 py-1.5 bg-surface-elevated border-b border-border/40">
-                    TCGPlayer <span className="text-[9px] font-normal opacity-60">(convertido para BRL)</span>
+                    TCGPlayer <span className="text-[9px] font-normal opacity-60">(sem listagem nacional — convertido p/ BRL)</span>
                   </p>
-                  <div className="grid grid-cols-3 divide-x divide-border/40">
-                    {[
-                      { label: "Mínimo", val: prices.floor },
-                      { label: "Médio",  val: prices.avg   },
-                      { label: "Máximo", val: prices.max   },
-                    ].map(({ label, val }) => (
-                      <div key={label} className="p-2 text-center">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">{label}</p>
-                        <p className="text-xs font-bold">{fmtBrl(val)}</p>
+                  <div className="px-4 py-3 flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Floor price</p>
+                      <p className="text-xl font-bold font-display leading-none">{fmtBrl(prices.floor ?? prices.avg)}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">menor oferta ativa</p>
+                    </div>
+                    {prices.avg != null && (
+                      <div className="text-right">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Médio</p>
+                        <p className="text-sm font-semibold text-muted-foreground">{fmtBrl(prices.avg)}</p>
                       </div>
-                    ))}
+                    )}
                   </div>
                   {prices.link && (
                     <a href={prices.link} target="_blank" rel="noopener noreferrer"
@@ -294,7 +303,7 @@ function CardModal({
                       : "bg-gradient-gold text-background hover:opacity-90"
                   )}
                   disabled={adding || owned}
-                  onClick={() => !owned && onAdd(card)}
+                  onClick={() => !owned && onAdd(card, prices?.floor ?? prices?.avg ?? null)}
                 >
                   {adding ? (
                     <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Adicionando...</>
@@ -350,7 +359,7 @@ function CardTile({
   owned: boolean;
   loggedIn: boolean;
   adding: boolean;
-  onAdd: (card: SetCard) => void;
+  onAdd: (card: SetCard, floorPrice?: number | null) => void;
   onLoginRequired: () => void;
   onOpenModal: (card: SetCard) => void;
 }) {
@@ -509,7 +518,7 @@ const SetDetail = () => {
 
   const defaultPortfolio = portfolios.find((p) => p.isDefault) ?? portfolios[0];
 
-  const handleAdd = useCallback(async (card: SetCard) => {
+  const handleAdd = useCallback(async (card: SetCard, floorPrice?: number | null) => {
     if (!session) return;
     if (!defaultPortfolio) {
       modal.error("Sem portfólio", "Crie um portfólio antes de adicionar cartas.");
@@ -517,7 +526,8 @@ const SetDetail = () => {
     }
     setAddingId(card.tcgId);
     try {
-      await addItem(defaultPortfolio._id, card.tcgId, 1, "NM", false, "", null, {
+      // purchasePrice = floor do MYP quando disponível — menor oferta ativa no mercado BR
+      await addItem(defaultPortfolio._id, card.tcgId, 1, "NM", false, "", floorPrice ?? null, {
         name: card.name, setName: card.setName, setCode: setId ?? "",
         number: card.number, rarity: card.rarity, types: card.types,
         imageUrl: card.imageUrl, supertype: card.supertype, subtypes: card.subtypes, hp: card.hp,
