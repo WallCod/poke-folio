@@ -305,7 +305,46 @@ function pickBestCard(cards: any[], mypEdition: string | undefined, numClean: st
   return null;
 }
 
-async function fetchMypPrice(name: string, number: string, tcgId?: string): Promise<{ floor: number | null; avg: number | null; max: number | null; link: string | null; qty: number | null }> {
+// Scraping do HTML da página de produto MYP para extrair o floor real (menor listagem ativa).
+// A API /carta/:slug só retorna histórico (min_price). O floor real está na tabela de lojistas.
+const floorScrapeCache: Record<string, { floor: number | null; at: number }> = {};
+const FLOOR_SCRAPE_TTL = 15 * 60 * 1000; // 15min
+
+async function scrapeMypFloor(link: string): Promise<number | null> {
+  if (floorScrapeCache[link] && Date.now() - floorScrapeCache[link].at < FLOOR_SCRAPE_TTL) {
+    return floorScrapeCache[link].floor;
+  }
+  try {
+    const { data: html } = await axios.get(link, {
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html',
+        'Accept-Language': 'pt-BR,pt;q=0.9',
+      },
+      responseType: 'text',
+    });
+
+    // Extrai todos os preços das listagens ativas: <span class="moeda">R$ X,XX</span>
+    // Aparece dentro de <td class="estoque-lista-precoestoque">
+    const matches = [...(html as string).matchAll(/estoque-lista-precoestoque[^<]*<span class="moeda">R\$\s*([\d]+,[\d]+)/g)];
+    if (matches.length === 0) {
+      floorScrapeCache[link] = { floor: null, at: Date.now() };
+      return null;
+    }
+
+    // Menor preço entre todas as listagens ativas = floor real
+    const prices = matches.map((m) => parseFloat(m[1].replace(',', '.')));
+    const floor = Math.min(...prices);
+
+    floorScrapeCache[link] = { floor, at: Date.now() };
+    return floor;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchMypPrice(name: string, number: string, tcgId?: string): Promise<{ floor: number | null; floorLive: number | null; avg: number | null; max: number | null; link: string | null; qty: number | null }> {
   const setId   = tcgId?.split('-')[0]?.toLowerCase();
   const mypEd   = setId ? TCG_TO_MYP[setId] : undefined;
   const numClean = number.replace(/[^0-9]/g, '').replace(/^0+/, '') || number.toLowerCase();
@@ -319,19 +358,25 @@ async function fetchMypPrice(name: string, number: string, tcgId?: string): Prom
     if (match) break;
   }
 
-  if (!match) return { floor: null, avg: null, max: null, link: null, qty: null };
+  if (!match) return { floor: null, floorLive: null, avg: null, max: null, link: null, qty: null };
+
+  const link = match.link ?? null;
+
+  // Scraping do floor real em paralelo com o retorno dos dados históricos
+  const floorLive = link ? await scrapeMypFloor(link) : null;
 
   return {
-    floor: match.min_price != null ? parseFloat(match.min_price) : null,
-    avg:   match.avg_price != null ? parseFloat(match.avg_price) : null,
-    max:   match.max_price != null ? parseFloat(match.max_price) : null,
-    link:  match.link ?? null,
-    qty:   match.available_quantity ?? null,
+    floor:     match.min_price != null ? parseFloat(match.min_price) : null, // histórico
+    floorLive,                                                                 // menor listagem ativa agora
+    avg:       match.avg_price != null ? parseFloat(match.avg_price) : null,
+    max:       match.max_price != null ? parseFloat(match.max_price) : null,
+    link,
+    qty:       match.available_quantity ?? null,
   };
 }
 
-type TcgPriceResult = { floor: number | null; avg: number | null; max: number | null; link: string | null; qty: number | null; source: string };
-const NULL_PRICE: TcgPriceResult = { floor: null, avg: null, max: null, link: null, qty: null, source: 'tcgplayer' };
+type TcgPriceResult = { floor: number | null; floorLive: number | null; avg: number | null; max: number | null; link: string | null; qty: number | null; source: string };
+const NULL_PRICE: TcgPriceResult = { floor: null, floorLive: null, avg: null, max: null, link: null, qty: null, source: 'tcgplayer' };
 
 // Busca preço do TCGPlayer como fallback quando a MYP não tem o card.
 // Pega o tier com maior market price — mais representativo para o colecionador.
@@ -364,12 +409,13 @@ async function fetchTcgPrice(tcgId: string): Promise<TcgPriceResult> {
     const safeCeil  = high != null && high <= market * 10  ? brl(high) : null;
 
     return {
-      floor:  safeFloor,
-      avg:    brl(market ?? mid),
-      max:    safeCeil,
-      link:   url,
-      qty:    null,
-      source: 'tcgplayer',
+      floor:     safeFloor,
+      floorLive: safeFloor, // TCGPlayer não tem scraping — usa o mesmo floor
+      avg:       brl(market ?? mid),
+      max:       safeCeil,
+      link:      url,
+      qty:       null,
+      source:    'tcgplayer',
     };
   } catch {
     return { ...NULL_PRICE };

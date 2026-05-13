@@ -78,7 +78,7 @@ function rarityBadge(rarity: string): string {
 
 // ─── Card Detail Modal ────────────────────────────────────────────────────────
 
-interface CardPrices { floor: number | null; avg: number | null; max: number | null; link?: string | null; source?: string | null; qty?: number | null }
+interface CardPrices { floor: number | null; floorLive: number | null; avg: number | null; max: number | null; link?: string | null; source?: string | null; qty?: number | null }
 
 const TYPE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   Fire:      { bg: "bg-orange-500/10", text: "text-orange-400", border: "border-orange-500/30" },
@@ -229,23 +229,23 @@ function CardModal({
                     <Loader2 className="h-3 w-3 animate-spin" />
                     <span className="text-[11px]">Buscando…</span>
                   </div>
-                ) : prices && isMYP && (prices.floor != null || prices.avg != null) ? (
+                ) : prices && isMYP && (prices.floorLive != null || prices.avg != null) ? (
                   <>
                     <div className="px-4 py-3 flex items-end justify-between gap-3">
-                      {/* Floor — menor listagem ativa agora */}
+                      {/* Floor real — menor listagem ativa agora (scraping) */}
                       <div>
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">
                           {mypSparse ? "Listagem única" : "Floor price"}
                         </p>
                         <p className="text-xl font-bold font-display text-primary leading-none">
-                          {fmtBrl(prices.floor ?? prices.avg)}
+                          {fmtBrl(prices.floorLive ?? prices.avg)}
                         </p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">menor oferta ativa</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">menor oferta ativa agora</p>
                       </div>
-                      {/* Média — referência secundária */}
+                      {/* Média histórica — referência secundária */}
                       {!mypSparse && prices.avg != null && (
                         <div className="text-right">
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Médio</p>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Médio hist.</p>
                           <p className="text-sm font-semibold text-muted-foreground">{fmtBrl(prices.avg)}</p>
                           {prices.qty != null && (
                             <p className="text-[10px] text-muted-foreground">{prices.qty} disponíve{prices.qty > 1 ? "is" : "l"}</p>
@@ -277,7 +277,7 @@ function CardModal({
                       <p className="text-xl font-bold font-display leading-none">{fmtBrl(prices.floor ?? prices.avg)}</p>
                       <p className="text-[10px] text-muted-foreground mt-0.5">menor oferta ativa</p>
                     </div>
-                    {prices.avg != null && (
+                    {prices.avg != null && prices.floor !== prices.avg && (
                       <div className="text-right">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Médio</p>
                         <p className="text-sm font-semibold text-muted-foreground">{fmtBrl(prices.avg)}</p>
@@ -303,7 +303,7 @@ function CardModal({
                       : "bg-gradient-gold text-background hover:opacity-90"
                   )}
                   disabled={adding || owned}
-                  onClick={() => !owned && onAdd(card, prices?.floor ?? prices?.avg ?? null)}
+                  onClick={() => !owned && onAdd(card, prices?.floorLive ?? prices?.avg ?? null)}
                 >
                   {adding ? (
                     <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Adicionando...</>
