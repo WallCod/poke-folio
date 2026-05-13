@@ -185,14 +185,19 @@ const CARD_PRICE_TTL = 15 * 60 * 1000; // 15min
 // Mapa setId TCG → edition_code MYP (verificado empiricamente)
 const TCG_TO_MYP: Record<string, string> = {
   // Scarlet & Violet (EN)
-  'sv8pt5': 'PRE', 'sv8': 'SSP',  'sv7': 'SCR',   'sv6pt5': 'SFA',
-  'sv6':    'TWM', 'sv5': 'TEF',  'sv4pt5': 'PAF', 'sv4': 'PAR',
-  'sv3pt5': 'MEW', 'sv3': 'OBF',  'sv2': 'SV2',   'sv1': 'SV1',
+  'sv10':    'DRI', 'sv9':    'JTG', 'sv8pt5': 'PRE', 'sv8': 'SSP',
+  'sv7':     'SCR', 'sv6pt5': 'SFA', 'sv6':    'TWM', 'sv5': 'TEF',
+  'sv4pt5':  'PAF', 'sv4':    'PAR', 'sv3pt5': 'MEW', 'sv3': 'OBF',
+  'sv2':     'SV2', 'sv1':    'SV1',
+  // Scarlet & Violet sub-sets / especiais
+  'rsv10pt5': 'WHT', 'zsv10pt5': 'BLK',
+  'swsh12pt5': 'CRZ',
   // Sword & Shield
   'swsh12':   'SIT', 'swsh11': 'LOR', 'swsh10pt5': 'PGO', 'swsh10': 'ASR',
   'swsh9':    'BRS', 'swsh8':  'FST', 'swsh7':     'EVS', 'swsh6':  'CRE',
   'swsh5':    'BST', 'swsh4pt5': 'SHF', 'swsh4':   'VIV', 'swsh35': 'CEL',
   'swsh3':    'DAA', 'swsh2':  'RCL', 'swsh1':     'SSH',
+  'pgo':      'PGO',
   // Sun & Moon
   'sm12': 'CEC', 'sm11': 'UNM', 'sm10': 'UNB', 'sm9':  'TEU',
   'sm8':  'HIF', 'sm7':  'CLS', 'sm75': 'DRM', 'sm6':  'FLI',
@@ -216,6 +221,8 @@ const TCG_TO_MYP: Record<string, string> = {
   'base1': 'BS', 'base2': 'B2', 'base3': 'JU', 'base4': 'FO',
   'base5': 'TK', 'base6': 'LC', 'gym1': 'G1', 'gym2': 'G2',
   'neo1': 'N1', 'neo2': 'N2', 'neo3': 'N3', 'neo4': 'N4',
+  // Mega Evolution (2025-2026)
+  'me1': 'MEG', 'me2': 'PFL', 'me2pt5': 'ASC', 'me3': 'POR',
 };
 
 const extractMypNum = (code: string) =>
@@ -257,30 +264,25 @@ const EN_EDITIONS_ORDERED = [
 const EN_EDITIONS_SET = new Set(EN_EDITIONS_ORDERED);
 
 function pickBestCard(cards: any[], mypEdition: string | undefined, numClean: string): any | null {
+  // Se não temos o código de edição MYP mapeado, não podemos garantir que é
+  // a carta certa — retorna null para não mostrar preço de outro set.
+  if (!mypEdition) return null;
+
   // 1. Edição exata + número exato
-  if (mypEdition) {
-    const m = cards.find((c) =>
-      c.edition_code?.toUpperCase() === mypEdition.toUpperCase() &&
-      extractMypNum(c.card_code) === numClean
-    );
-    if (m) return m;
-  }
-
-  // 2. Qualquer edição EN com mesmo número e preço
-  const byNum = cards.filter((c) =>
-    extractMypNum(c.card_code) === numClean &&
-    c.min_price != null &&
-    EN_EDITIONS_SET.has(c.edition_code?.toUpperCase())
+  const exact = cards.find((c) =>
+    c.edition_code?.toUpperCase() === mypEdition.toUpperCase() &&
+    extractMypNum(c.card_code) === numClean
   );
-  if (byNum.length > 0) return byNum[0];
+  if (exact) return exact;
 
-  // 3. Qualquer edição (incluindo JP) com mesmo número e preço
-  const byNumAny = cards.filter((c) =>
-    extractMypNum(c.card_code) === numClean && c.min_price != null
+  // 2. Edição exata, qualquer número com preço (variantes da mesma edição: holo, full art, etc.)
+  // Só aceita se há exatamente 1 resultado — ambiguidade = null
+  const sameEd = cards.filter((c) =>
+    c.edition_code?.toUpperCase() === mypEdition.toUpperCase() &&
+    c.min_price != null
   );
-  if (byNumAny.length > 0) return byNumAny[0];
+  if (sameEd.length === 1) return sameEd[0];
 
-  // Sem correspondência por número — não retorna carta errada
   return null;
 }
 
