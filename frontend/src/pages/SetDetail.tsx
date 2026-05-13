@@ -185,49 +185,47 @@ function CardModal({
 
             {/* Preços BRL */}
             <div className="rounded-xl border border-border/50 bg-surface-elevated/60 p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                  Preço de mercado (BRL)
-                </p>
-                {prices?.source && (
-                  <span className="text-[9px] text-muted-foreground/60 uppercase tracking-wider">
-                    via {prices.source === "tcgplayer" ? "TCGPlayer" : "MYP"}
-                  </span>
-                )}
-              </div>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                Preço de mercado (BRL)
+              </p>
               {pricesLoading ? (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" /> Buscando preços...
                 </div>
               ) : prices && (prices.floor != null || prices.avg != null) ? (
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  {[
-                    { label: "Mínimo", val: prices.floor },
-                    { label: "Médio",  val: prices.avg },
-                    { label: "Máximo", val: prices.max },
-                  ].map(({ label, val }) => (
-                    <div key={label} className="space-y-0.5">
-                      <p className="text-[10px] text-muted-foreground">{label}</p>
-                      <p className="text-sm font-bold font-mono text-primary">
-                        {val != null
-                          ? `R$ ${val.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                          : "—"}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    {[
+                      { label: "Mínimo", val: prices.floor },
+                      { label: "Médio",  val: prices.avg },
+                      { label: "Máximo", val: prices.max },
+                    ].map(({ label, val }) => (
+                      <div key={label} className="space-y-0.5">
+                        <p className="text-[10px] text-muted-foreground">{label}</p>
+                        <p className="text-sm font-bold font-mono text-primary">
+                          {val != null
+                            ? `R$ ${val.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : "—"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Link MYP tem prioridade — é mercado nacional em BRL */}
+                  {prices.source !== "tcgplayer" && prices.link ? (
+                    <a href={prices.link} target="_blank" rel="noopener noreferrer"
+                      className="block text-center text-[11px] text-primary/70 hover:text-primary transition-colors pt-0.5">
+                      Ver no Mercado Pokémon BR →
+                    </a>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground/50 text-center pt-0.5">
+                      Preço convertido do TCGPlayer · sem listagem nacional
+                    </p>
+                  )}
+                </>
               ) : (
-                <p className="text-xs text-muted-foreground">Preço não disponível.</p>
-              )}
-              {prices?.link && (
-                <a
-                  href={prices.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-center text-[11px] text-primary/70 hover:text-primary transition-colors pt-1"
-                >
-                  Ver listagens →
-                </a>
+                <p className="text-xs text-muted-foreground">
+                  Sem listagem disponível no mercado nacional.
+                </p>
               )}
             </div>
 
