@@ -8,7 +8,7 @@ const router = Router();
 const TCG_KEY = process.env.POKEMONTCG_API_KEY ?? '';
 const tcgClient = axios.create({
   baseURL: 'https://api.pokemontcg.io/v2',
-  timeout: 8000,
+  timeout: 20000,
   headers: TCG_KEY ? { 'X-Api-Key': TCG_KEY } : {},
 });
 
@@ -41,7 +41,7 @@ let topCardsCache: { data: any[]; at: number } | null = null;
 const setCardsCache: Record<string, { data: any; at: number }> = {};
 
 const SETS_TTL      = 6  * 60 * 60 * 1000;   // 6h
-const TREND_TTL     = 5  * 60 * 1000;         // 5min (marketSnapshot roda a cada 30min)
+const TREND_TTL     = 30 * 60 * 1000;         // 30min
 const TOP_TTL       = 30 * 60 * 1000;         // 30min
 const SET_CARDS_TTL = 12 * 60 * 60 * 1000;   // 12h
 
@@ -440,9 +440,119 @@ router.get('/top', async (_req: Request, res: Response) => {
 });
 
 // ─── GET /api/public/trending ─────────────────────────────────────────────────
-// gainers  → cartas com market muito acima do mid (pressão de compra real)
-// losers   → cartas com market abaixo do mid (pressão de venda)
-// popular  → top por valor absoluto de mercado
+
+async function fetchTrendingData(period: string): Promise<{ gainers: any[]; losers: any[]; popular: any[]; period: string }> {
+  const rate = await getUsdBrlRate();
+
+  const [highRes, midRes, popularRes] = await Promise.allSettled([
+    tcgClient.get('/cards', {
+      params: {
+        q: 'tcgplayer.prices.holofoil.market:[50 TO *]',
+        orderBy: '-tcgplayer.prices.holofoil.market',
+        pageSize: 100,
+        select: 'id,name,set,number,rarity,types,images,tcgplayer',
+      },
+    }),
+    tcgClient.get('/cards', {
+      params: {
+        q: 'tcgplayer.prices.holofoil.market:[20 TO 80]',
+        orderBy: '-tcgplayer.prices.holofoil.market',
+        pageSize: 250,
+        select: 'id,name,set,number,rarity,types,images,tcgplayer',
+      },
+    }),
+    tcgClient.get('/cards', {
+      params: {
+        q: 'tcgplayer.prices.holofoil.market:[10 TO *]',
+        orderBy: '-tcgplayer.prices.holofoil.market',
+        pageSize: 30,
+        select: 'id,name,set,number,rarity,types,images,tcgplayer',
+      },
+    }),
+  ]);
+
+  const isSparse = (c: any) =>
+    c.lowUsd != null && c.midUsd != null && c.highUsd != null &&
+    c.lowUsd === c.midUsd && c.midUsd === c.highUsd;
+
+  const gainers = highRes.status === 'fulfilled'
+    ? (highRes.value.data.data as any[])
+        .map((c) => tcgCardToItem(c, rate))
+        .filter(Boolean)
+        .filter((c: any) => !isSparse(c))
+        .map((c: any) => {
+          const { priceUsd: market, lowUsd: low } = c;
+          if (low != null && low > 0 && market != null && low >= market / 3) {
+            return { ...c, changePct: Math.round(((market - low) / low) * 1000) / 10 };
+          }
+          return { ...c, changePct: null };
+        })
+        .filter((c: any) => c.changePct !== null && c.changePct > 5)
+        .sort((a: any, b: any) => (b.changePct ?? 0) - (a.changePct ?? 0))
+        .slice(0, 10)
+    : [];
+
+  const daySeed = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
+  let losers: any[] = [];
+  if (midRes.status === 'fulfilled') {
+    // Losers: market < mid significa que as transações recentes acontecem abaixo
+    // do preço pedido mediano — sinal real de queda de demanda.
+    // O high do TCGPlayer inclui listagens históricas abandonadas, não é útil aqui.
+    losers = (midRes.value.data.data as any[])
+      .map((c) => tcgCardToItem(c, rate))
+      .filter(Boolean)
+      .filter((c: any) => !isSparse(c))
+      .map((c: any) => {
+        const { priceUsd: market, midUsd: mid, lowUsd: low } = c;
+        // Usa mid como referência; fallback para low se mid ausente
+        const ref = mid ?? low;
+        if (ref != null && ref > 0 && market != null) {
+          return { ...c, changePct: Math.round(((market - ref) / ref) * 1000) / 10 };
+        }
+        return { ...c, changePct: null };
+      })
+      .filter((c: any) => c.changePct !== null && c.changePct < -8)
+      .map((c: any, i: number) => ({ c, sort: (i * 2654435761 + daySeed) >>> 0 }))
+      .sort((a: any, b: any) => a.sort - b.sort)
+      .map(({ c }: any) => c)
+      .slice(0, 10);
+  } else {
+    const reason = (midRes as PromiseRejectedResult).reason;
+    console.error('[trending/losers] midRes rejected:', reason?.code ?? reason?.message ?? reason);
+  }
+
+  const popular = popularRes.status === 'fulfilled'
+    ? (popularRes.value.data.data as any[])
+        .map((c) => tcgCardToItem(c, rate))
+        .filter(Boolean)
+        .map((c: any) => {
+          if (isSparse(c)) return { ...c, changePct: null };
+          if (c.changePct !== null) return c;
+          const { priceUsd: market, lowUsd: low } = c;
+          if (low != null && low > 0 && market != null && low <= market * 5) {
+            return { ...c, changePct: Math.round(((market - low) / low) * 1000) / 10 };
+          }
+          return c;
+        })
+        .slice(0, 10)
+    : [];
+
+  return { gainers, losers, popular, period };
+}
+
+// Pré-aquece o cache de trending na inicialização do servidor
+export async function warmUpTrendingCache(): Promise<void> {
+  try {
+    console.log('[Cache] Aquecendo cache de trending...');
+    const data = await fetchTrendingData('week');
+    if (data.popular.length > 0 || data.gainers.length > 0) {
+      trendingCache = { data, at: Date.now(), period: 'week' };
+      console.log(`[Cache] Trending pronto: gainers=${data.gainers.length} losers=${data.losers.length} popular=${data.popular.length}`);
+    }
+  } catch (err: any) {
+    console.error('[Cache] Falha no warm-up do trending:', err?.message);
+  }
+}
 
 router.get('/trending', async (req: Request, res: Response) => {
   const period = (req.query.period as string) ?? 'week';
@@ -453,118 +563,8 @@ router.get('/trending', async (req: Request, res: Response) => {
       return;
     }
 
-    const rate = await getUsdBrlRate();
-
-    const [highRes, midRes, popularRes] = await Promise.allSettled([
-      // Gainers: cartas de alto valor — pageSize maior para ter candidatos suficientes após filtro changePct > 0
-      tcgClient.get('/cards', {
-        params: {
-          q: 'tcgplayer.prices.holofoil.market:[50 TO *]',
-          orderBy: '-tcgplayer.prices.holofoil.market',
-          pageSize: 100,
-          select: 'id,name,set,number,rarity,types,images,tcgplayer',
-        },
-      }),
-      // Losers: faixa intermediária com seed do dia para variedade
-      tcgClient.get('/cards', {
-        params: {
-          q: 'tcgplayer.prices.holofoil.market:[20 TO 80]',
-          orderBy: '-tcgplayer.prices.holofoil.market',
-          pageSize: 250,
-          select: 'id,name,set,number,rarity,types,images,tcgplayer',
-        },
-      }),
-      // Popular: top geral por valor
-      tcgClient.get('/cards', {
-        params: {
-          q: 'tcgplayer.prices.holofoil.market:[10 TO *]',
-          orderBy: '-tcgplayer.prices.holofoil.market',
-          pageSize: 30,
-          select: 'id,name,set,number,rarity,types,images,tcgplayer',
-        },
-      }),
-    ]);
-
-    // Listagem única: low===mid===high — changePct distorcido, não usar como sinal de tendência
-    const isSparse = (c: any) =>
-      c.lowUsd != null && c.midUsd != null && c.highUsd != null &&
-      c.lowUsd === c.midUsd && c.midUsd === c.highUsd;
-
-    // Para gainers: usa (market - low) / low — market acima do mínimo recente = pressão de compra.
-    // Mínimo de +5% para filtrar ruído.
-    const gainers = highRes.status === 'fulfilled'
-      ? (highRes.value.data.data as any[])
-          .map((c) => tcgCardToItem(c, rate))
-          .filter(Boolean)
-          .filter((c: any) => !isSparse(c))
-          .map((c: any) => {
-            const { priceUsd: market, lowUsd: low } = c;
-            // low < market/3 → outlier de listagem barata, não usar como sinal de alta
-            if (low != null && low > 0 && market != null && low >= market / 3) {
-              const pct = Math.round(((market - low) / low) * 1000) / 10;
-              return { ...c, changePct: pct };
-            }
-            return { ...c, changePct: null };
-          })
-          .filter((c: any) => c.changePct !== null && c.changePct > 5)
-          .sort((a: any, b: any) => (b.changePct ?? 0) - (a.changePct ?? 0))
-          .slice(0, 10)
-      : [];
-
-    const daySeed = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
-    let losers: any[] = [];
-    if (midRes.status === 'fulfilled') {
-      const raw = midRes.value.data.data as any[];
-
-      // Para losers: usa (market - high) / high como sinal.
-      // Cartas onde o market está abaixo do high = caíram de um pico recente.
-      // Mínimo de spread de -5% para filtrar ruído.
-      const candidates = raw
-        .map((c) => tcgCardToItem(c, rate))
-        .filter(Boolean)
-        .filter((c: any) => !isSparse(c))
-        .map((c: any) => {
-          const { priceUsd: market, highUsd: high } = c;
-          // high > 3x market → provável outlier de listagem, não usar como sinal de queda
-          if (high != null && high > 0 && market != null && high <= market * 3) {
-            const pct = Math.round(((market - high) / high) * 1000) / 10;
-            return { ...c, changePct: pct };
-          }
-          return { ...c, changePct: null };
-        })
-        .filter((c: any) => c.changePct !== null && c.changePct < -5);
-
-
-      losers = candidates
-        .map((c: any, i: number) => ({ c, sort: (i * 2654435761 + daySeed) >>> 0 }))
-        .sort((a: any, b: any) => a.sort - b.sort)
-        .map(({ c }: any) => c)
-        .slice(0, 10);
-    } else {
-      console.error('[trending/losers] midRes rejected:', (midRes as any).reason?.message ?? midRes);
-    }
-
-    const popular = popularRes.status === 'fulfilled'
-      ? (popularRes.value.data.data as any[])
-          .map((c) => tcgCardToItem(c, rate))
-          .filter(Boolean)
-          .map((c: any) => {
-            if (isSparse(c)) return { ...c, changePct: null };
-            // Se changePct já calculado (market vs mid) — mantém
-            if (c.changePct !== null) return c;
-            // Fallback: usa market vs low quando mid não disponível
-            const { priceUsd: market, lowUsd: low } = c;
-            if (low != null && low > 0 && market != null && low <= market * 5) {
-              return { ...c, changePct: Math.round(((market - low) / low) * 1000) / 10 };
-            }
-            return c;
-          })
-          .slice(0, 10)
-      : [];
-
-    const result = { gainers, losers, popular, period };
-    // Só cacheia se todas as três listas tiverem dados
-    if (gainers.length > 0 && losers.length > 0 && popular.length > 0) {
+    const result = await fetchTrendingData(period);
+    if (result.popular.length > 0 || result.gainers.length > 0) {
       trendingCache = { data: result, at: Date.now(), period };
     }
     res.json(result);
