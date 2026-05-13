@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import axios from 'axios';
 import Card from '../models/Card';
-import PriceHistory from '../models/PriceHistory';
 
 const router = Router();
 
@@ -44,19 +43,6 @@ const SETS_TTL      = 6  * 60 * 60 * 1000;   // 6h
 const TREND_TTL     = 30 * 60 * 1000;         // 30min
 const TOP_TTL       = 30 * 60 * 1000;         // 30min
 const SET_CARDS_TTL = 12 * 60 * 60 * 1000;   // 12h
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function extractUsdPrice(raw: any): number | null {
-  const p = raw?.tcgplayer?.prices;
-  if (!p) return null;
-  return p.holofoil?.market
-    ?? p['1stEditionHolofoil']?.market
-    ?? p.ultraHolofoil?.market
-    ?? p.normal?.market
-    ?? p.reverseHolofoil?.market
-    ?? null;
-}
 
 // Taxa de câmbio USD→BRL em cache simples
 let brlRateCache: { rate: number; at: number } | null = null;
@@ -323,41 +309,49 @@ async function fetchMypPrice(name: string, number: string, tcgId?: string): Prom
   };
 }
 
-// Busca preço do TCGPlayer como fallback quando a MYP não tem o card
-async function fetchTcgPrice(tcgId: string): Promise<{ floor: number | null; avg: number | null; max: number | null; link: string | null; qty: number | null; source: string }> {
+type TcgPriceResult = { floor: number | null; avg: number | null; max: number | null; link: string | null; qty: number | null; source: string };
+const NULL_PRICE: TcgPriceResult = { floor: null, avg: null, max: null, link: null, qty: null, source: 'tcgplayer' };
+
+// Busca preço do TCGPlayer como fallback quando a MYP não tem o card.
+// Pega o tier com maior market price — mais representativo para o colecionador.
+async function fetchTcgPrice(tcgId: string): Promise<TcgPriceResult> {
   try {
     const rate = await getUsdBrlRate();
     const { data } = await tcgClient.get(`/cards/${tcgId}`, {
       params: { select: 'id,tcgplayer' },
     });
-    const p = data?.data?.tcgplayer?.prices;
+    const p   = data?.data?.tcgplayer?.prices as Record<string, any> | undefined;
     const url = data?.data?.tcgplayer?.url ?? null;
-    if (!p) return { floor: null, avg: null, max: null, link: null, qty: null, source: 'tcgplayer' };
+    if (!p) return { ...NULL_PRICE, link: url };
 
-    const tier = p.holofoil ?? p['1stEditionHolofoil'] ?? p.ultraHolofoil ?? p.reverseHolofoil ?? p.normal ?? null;
-    if (!tier) return { floor: null, avg: null, max: null, link: null, qty: null, source: 'tcgplayer' };
+    // Pega o tier com maior market (ignora tiers sem market)
+    const tier = Object.values(p)
+      .filter((t) => t?.market != null)
+      .sort((a, b) => (b.market ?? 0) - (a.market ?? 0))[0] ?? null;
+
+    if (!tier) return { ...NULL_PRICE, link: url };
 
     const brl = (v: number | null | undefined) => v != null ? Math.round(v * rate * 100) / 100 : null;
-    const market = tier.market as number | null;
+    const market = tier.market as number;
     const mid    = tier.mid    as number | null;
     const low    = tier.low    as number | null;
     const high   = tier.high   as number | null;
 
-    // low/high do TCGPlayer frequentemente têm outliers ($0.01 a $9999).
-    // Só usa se estiver dentro de 10x do market.
-    const safeFloor = low  != null && market != null && low  >= market / 10 ? brl(low)  : null;
-    const safeCeil  = high != null && market != null && high <= market * 10  ? brl(high) : null;
+    // low/high do TCGPlayer frequentemente têm outliers ($0.01 / $9999).
+    // Só usa se estiver dentro de 10x do market price.
+    const safeFloor = low  != null && low  >= market / 10 ? brl(low)  : null;
+    const safeCeil  = high != null && high <= market * 10  ? brl(high) : null;
 
     return {
-      floor: safeFloor,
-      avg:   brl(market ?? mid),
-      max:   safeCeil,
-      link:  url,
-      qty:   null,
+      floor:  safeFloor,
+      avg:    brl(market ?? mid),
+      max:    safeCeil,
+      link:   url,
+      qty:    null,
       source: 'tcgplayer',
     };
   } catch {
-    return { floor: null, avg: null, max: null, link: null, qty: null, source: 'tcgplayer' };
+    return { ...NULL_PRICE };
   }
 }
 
