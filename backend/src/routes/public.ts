@@ -114,6 +114,55 @@ router.get('/sets', async (_req: Request, res: Response) => {
 
 // ─── GET /api/public/sets/:setId/cards ───────────────────────────────────────
 
+async function fetchSetCards(setId: string): Promise<any> {
+  const { data } = await tcgClient.get('/cards', {
+    params: {
+      q: `set.id:${setId}`,
+      orderBy: 'number',
+      pageSize: 250,
+      select: 'id,name,number,rarity,types,images,supertype,subtypes,hp,set',
+    },
+  });
+  const result = {
+    setId,
+    total: (data.data as any[]).length,
+    cards: (data.data as any[]).map((c: any) => ({
+      tcgId:     c.id,
+      name:      c.name,
+      number:    c.number,
+      rarity:    c.rarity ?? 'Unknown',
+      types:     c.types ?? [],
+      imageUrl:  c.images?.small ?? '',
+      supertype: c.supertype ?? 'Pokémon',
+      subtypes:  c.subtypes ?? [],
+      hp:        c.hp ?? '',
+      setName:   c.set?.name ?? '',
+    })),
+  };
+  setCardsCache[setId] = { data: result, at: Date.now() };
+  return result;
+}
+
+// Pré-aquece os sets em lotes para não sobrecarregar a TCG API
+export async function warmUpSetCache(): Promise<void> {
+  const ids = FALLBACK_SETS.map((s) => s.id);
+  const BATCH = 3;
+  console.log(`[Cache] Aquecendo ${ids.length} sets em lotes de ${BATCH}...`);
+  for (let i = 0; i < ids.length; i += BATCH) {
+    const batch = ids.slice(i, i + BATCH);
+    await Promise.allSettled(
+      batch.map((id) =>
+        fetchSetCards(id)
+          .then(() => console.log(`[Cache] Set ${id} pronto`))
+          .catch((e: any) => console.warn(`[Cache] Set ${id} falhou: ${e?.message}`))
+      )
+    );
+    // Pausa entre lotes para não saturar a API externa
+    if (i + BATCH < ids.length) await new Promise((r) => setTimeout(r, 1000));
+  }
+  console.log('[Cache] Warm-up de sets concluído.');
+}
+
 router.get('/sets/:setId/cards', async (req: Request, res: Response) => {
   const { setId } = req.params;
 
@@ -129,33 +178,7 @@ router.get('/sets/:setId/cards', async (req: Request, res: Response) => {
       return;
     }
 
-    const { data } = await tcgClient.get('/cards', {
-      params: {
-        q: `set.id:${setId}`,
-        orderBy: 'number',
-        pageSize: 250,
-        select: 'id,name,number,rarity,types,images,supertype,subtypes,hp,set',
-      },
-    });
-
-    const result = {
-      setId,
-      total: (data.data as any[]).length,
-      cards: (data.data as any[]).map((c: any) => ({
-        tcgId:     c.id,
-        name:      c.name,
-        number:    c.number,
-        rarity:    c.rarity ?? 'Unknown',
-        types:     c.types ?? [],
-        imageUrl:  c.images?.small ?? '',
-        supertype: c.supertype ?? 'Pokémon',
-        subtypes:  c.subtypes ?? [],
-        hp:        c.hp ?? '',
-        setName:   c.set?.name ?? '',
-      })),
-    };
-
-    setCardsCache[setId] = { data: result, at: Date.now() };
+    const result = await fetchSetCards(setId);
     res.json(result);
   } catch (err: any) {
     const msg = err?.code ?? err?.message ?? 'erro desconhecido';

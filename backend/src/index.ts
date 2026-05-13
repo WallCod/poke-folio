@@ -13,7 +13,7 @@ import authRouter from './routes/auth';
 import cardsRouter from './routes/cards';
 import portfoliosRouter from './routes/portfolios';
 import marketRouter from './routes/market';
-import publicRouter, { warmUpTrendingCache } from './routes/public';
+import publicRouter, { warmUpTrendingCache, warmUpSetCache } from './routes/public';
 import { scheduleDailyPriceSnapshot } from './jobs/dailyPriceSnapshot';
 import { scheduleMarketSnapshot } from './jobs/marketSnapshot';
 
@@ -97,6 +97,7 @@ async function bootstrap() {
   scheduleMarketSnapshot();
   // Warm-up em background — não bloqueia o boot
   warmUpTrendingCache().catch(() => {});
+  warmUpSetCache().catch(() => {});
 }
 
 bootstrap();
