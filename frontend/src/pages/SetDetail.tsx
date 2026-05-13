@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, Plus, Loader2, Lock, Star, X } from "lucide-react";
+import { ArrowLeft, Check, Plus, Loader2, Lock, X, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EnergyIcon } from "@/components/EnergyIcon";
 import { getSession } from "@/lib/auth";
@@ -78,7 +78,34 @@ function rarityBadge(rarity: string): string {
 
 // ─── Card Detail Modal ────────────────────────────────────────────────────────
 
-interface CardPrices { floor: number | null; avg: number | null; max: number | null; link?: string | null; source?: string | null }
+interface CardPrices { floor: number | null; avg: number | null; max: number | null; link?: string | null; source?: string | null; qty?: number | null }
+
+const TYPE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  Fire:      { bg: "bg-orange-500/10", text: "text-orange-400", border: "border-orange-500/30" },
+  Water:     { bg: "bg-blue-500/10",   text: "text-blue-400",   border: "border-blue-500/30"   },
+  Grass:     { bg: "bg-green-500/10",  text: "text-green-400",  border: "border-green-500/30"  },
+  Lightning: { bg: "bg-yellow-400/10", text: "text-yellow-300", border: "border-yellow-400/30" },
+  Psychic:   { bg: "bg-pink-500/10",   text: "text-pink-400",   border: "border-pink-500/30"   },
+  Fighting:  { bg: "bg-red-700/10",    text: "text-red-400",    border: "border-red-600/30"    },
+  Darkness:  { bg: "bg-purple-900/20", text: "text-purple-300", border: "border-purple-700/30" },
+  Metal:     { bg: "bg-slate-400/10",  text: "text-slate-300",  border: "border-slate-400/30"  },
+  Dragon:    { bg: "bg-indigo-500/10", text: "text-indigo-400", border: "border-indigo-500/30" },
+  Fairy:     { bg: "bg-pink-300/10",   text: "text-pink-300",   border: "border-pink-300/30"   },
+  Colorless: { bg: "bg-white/5",       text: "text-gray-300",   border: "border-white/15"      },
+};
+
+const fmtBrl = (v?: number | null) =>
+  v != null ? `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—";
+
+function TypeBadge({ type }: { type: string }) {
+  const c = TYPE_COLORS[type] ?? TYPE_COLORS.Colorless;
+  return (
+    <span className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border", c.bg, c.text, c.border)}>
+      <EnergyIcon type={type} size={11} />
+      {type}
+    </span>
+  );
+}
 
 function CardModal({
   card, owned, loggedIn, adding, onAdd, onClose, onLoginRequired,
@@ -91,6 +118,9 @@ function CardModal({
   const [prices, setPrices] = useState<CardPrices | null>(null);
   const [pricesLoading, setPricesLoading] = useState(true);
 
+  const typeColor = TYPE_COLORS[card.types[0] ?? "Colorless"] ?? TYPE_COLORS.Colorless;
+  const largeImg = card.imageUrl ? card.imageUrl.replace("/small/", "/large/") : "";
+
   useEffect(() => {
     setPricesLoading(true);
     const baseUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3001/api").replace(/\/api$/, "");
@@ -102,6 +132,10 @@ function CardModal({
       .finally(() => setPricesLoading(false));
   }, [card.tcgId]);
 
+  const isMYP = prices?.source !== "tcgplayer";
+  const mypSparse = prices && prices.floor != null && prices.avg != null && prices.max != null
+    && prices.floor === prices.avg && prices.avg === prices.max;
+
   return (
     <>
       <div
@@ -109,8 +143,7 @@ function CardModal({
         onClick={onClose}
       >
         <div
-          className="relative bg-card border border-border/70 rounded-2xl shadow-2xl w-full overflow-hidden flex flex-col sm:flex-row"
-          style={{ maxWidth: 520 }}
+          className="relative bg-card border border-border/70 rounded-2xl shadow-2xl w-full max-w-[460px] flex flex-col max-h-[90vh]"
           onClick={(e) => e.stopPropagation()}
         >
           <button
@@ -120,116 +153,124 @@ function CardModal({
             <X className="h-4 w-4" />
           </button>
 
-          {/* Imagem — coluna esquerda — clicável para lightbox */}
-          <div className="sm:w-44 shrink-0 bg-card/60">
-            <div
-              className="aspect-[2.5/3.5] relative cursor-zoom-in"
-              onClick={(e) => { e.stopPropagation(); setImgLarge(true); }}
-              title="Clique para ampliar"
-            >
-              {card.imageUrl && !imgErr ? (
-                <img
-                  src={card.imageUrl}
-                  alt={card.name}
-                  className="w-full h-full object-contain"
-                  onError={() => setImgErr(true)}
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-4">
-                  {card.types[0] && <EnergyIcon type={card.types[0]} size={40} />}
-                  <span className="text-xs text-muted-foreground text-center">{card.name}</span>
+          {/* Header com cor do tipo */}
+          <div className={cn("px-4 pt-4 pb-3 border-b border-border/40 shrink-0", typeColor.bg)}>
+            <div className="flex items-center gap-3">
+              <div
+                className="h-16 w-11 rounded-lg overflow-hidden border border-border/50 shrink-0 cursor-zoom-in hover:opacity-80 transition-opacity"
+                onClick={() => card.imageUrl && setImgLarge(true)}
+              >
+                {card.imageUrl && !imgErr
+                  ? <img src={card.imageUrl} alt={card.name} className="h-full w-full object-cover" onError={() => setImgErr(true)} />
+                  : <div className={cn("h-full w-full flex items-center justify-center", typeColor.bg)}>
+                      {card.types[0] && <EnergyIcon type={card.types[0]} size={24} />}
+                    </div>
+                }
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-display font-bold text-base leading-tight truncate">{card.name}</p>
+                <p className="text-[11px] text-muted-foreground">{card.setName} · #{card.number}</p>
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  {card.rarity && (
+                    <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full border", rarityBadge(card.rarity))}>
+                      {card.rarity}
+                    </span>
+                  )}
+                  {card.hp && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-background/40 border border-border/50 text-muted-foreground">
+                      HP {card.hp}
+                    </span>
+                  )}
+                  {card.types.map((t) => <TypeBadge key={t} type={t} />)}
                 </div>
-              )}
+              </div>
               {owned && (
-                <div className="absolute top-2 left-2 flex items-center gap-1 bg-primary/90 text-background text-[10px] font-bold px-2 py-1 rounded-full">
+                <div className="flex items-center gap-1 bg-primary/20 text-primary text-[10px] font-bold px-2 py-1 rounded-full border border-primary/30 shrink-0">
                   <Check className="h-3 w-3" /> Tenho
                 </div>
               )}
-              {/* indicador zoom */}
-              <div className="absolute bottom-1.5 right-1.5 p-1 rounded bg-background/60 text-muted-foreground opacity-60">
-                <Star className="h-3 w-3" style={{ transform: "rotate(45deg)" }} />
-              </div>
             </div>
           </div>
 
-          {/* Info — coluna direita */}
-          <div className="flex-1 p-5 flex flex-col gap-3 min-w-0 overflow-y-auto" style={{ maxHeight: "80vh" }}>
-            <div>
-              <h3 className="font-display font-bold text-xl leading-tight">{card.name}</h3>
-              <p className="text-sm text-muted-foreground mt-0.5">{card.setName} · #{card.number}</p>
+          {/* Corpo scrollável */}
+          <div className="overflow-y-auto flex-1 p-4 space-y-3">
+
+            {/* MYP — mercado nacional */}
+            <div className="rounded-xl border border-border/50 overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-elevated border-b border-border/40">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Mercado Pokémon BR</p>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-semibold">MYP</span>
+              </div>
+              {pricesLoading ? (
+                <div className="flex items-center justify-center py-3 gap-2 text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span className="text-[11px]">Buscando…</span>
+                </div>
+              ) : prices && isMYP && (prices.floor != null || prices.avg != null) ? (
+                <>
+                  {mypSparse ? (
+                    <div className="px-3 py-2.5 text-center">
+                      <p className="text-[10px] text-yellow-400/80 uppercase tracking-wider mb-0.5">Listagem única ativa</p>
+                      <p className="text-sm font-bold">{fmtBrl(prices.avg)}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {prices.qty != null ? `${prices.qty} unidade${prices.qty > 1 ? "s" : ""} disponível` : "único vendedor"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 divide-x divide-border/40">
+                      {[
+                        { label: "Mínimo", val: prices.floor },
+                        { label: "Médio",  val: prices.avg   },
+                        { label: "Máximo", val: prices.max   },
+                      ].map(({ label, val }) => (
+                        <div key={label} className="p-2 text-center">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">{label}</p>
+                          <p className="text-xs font-bold text-primary">{fmtBrl(val)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {prices.link && (
+                    <a href={prices.link} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1 w-full py-1.5 border-t border-border/40 text-[11px] text-muted-foreground hover:text-foreground hover:bg-primary/5 transition-all">
+                      <ArrowRight className="h-3 w-3" /> Ver no MYP
+                    </a>
+                  )}
+                </>
+              ) : !pricesLoading && (
+                <p className="text-[11px] text-muted-foreground text-center py-3">Sem listagens no mercado BR</p>
+              )}
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              {card.rarity && (
-                <span className={cn("text-xs font-semibold px-2.5 py-1 rounded-full border", rarityBadge(card.rarity))}>
-                  {card.rarity}
-                </span>
-              )}
-              {card.supertype && card.supertype !== "Pokémon" && (
-                <span className="text-xs text-muted-foreground border border-border/50 px-2.5 py-1 rounded-full">{card.supertype}</span>
-              )}
-              {card.hp && (
-                <span className="text-xs text-muted-foreground border border-border/50 px-2.5 py-1 rounded-full">HP {card.hp}</span>
-              )}
-            </div>
-
-            {card.types.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
-                {card.types.map((t) => (
-                  <span key={t} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <EnergyIcon type={t} size={14} /> {t}
-                  </span>
-                ))}
+            {/* TCGPlayer fallback */}
+            {!pricesLoading && prices && !isMYP && (prices.floor != null || prices.avg != null) && (
+              <div className="rounded-xl border border-border/50 overflow-hidden">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-3 py-1.5 bg-surface-elevated border-b border-border/40">
+                  TCGPlayer <span className="text-[9px] font-normal opacity-60">(convertido para BRL)</span>
+                </p>
+                <div className="grid grid-cols-3 divide-x divide-border/40">
+                  {[
+                    { label: "Mínimo", val: prices.floor },
+                    { label: "Médio",  val: prices.avg   },
+                    { label: "Máximo", val: prices.max   },
+                  ].map(({ label, val }) => (
+                    <div key={label} className="p-2 text-center">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">{label}</p>
+                      <p className="text-xs font-bold">{fmtBrl(val)}</p>
+                    </div>
+                  ))}
+                </div>
+                {prices.link && (
+                  <a href={prices.link} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1 w-full py-1.5 border-t border-border/40 text-[11px] text-muted-foreground hover:text-foreground hover:bg-primary/5 transition-all">
+                    <ArrowRight className="h-3 w-3" /> Ver no TCGPlayer
+                  </a>
+                )}
               </div>
             )}
 
-            {/* Preços BRL */}
-            <div className="rounded-xl border border-border/50 bg-surface-elevated/60 p-3 space-y-2">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                Preço de mercado (BRL)
-              </p>
-              {pricesLoading ? (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" /> Buscando preços...
-                </div>
-              ) : prices && (prices.floor != null || prices.avg != null) ? (
-                <>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    {[
-                      { label: "Mínimo", val: prices.floor },
-                      { label: "Médio",  val: prices.avg },
-                      { label: "Máximo", val: prices.max },
-                    ].map(({ label, val }) => (
-                      <div key={label} className="space-y-0.5">
-                        <p className="text-[10px] text-muted-foreground">{label}</p>
-                        <p className="text-sm font-bold font-mono text-primary">
-                          {val != null
-                            ? `R$ ${val.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                            : "—"}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Link MYP tem prioridade — é mercado nacional em BRL */}
-                  {prices.source !== "tcgplayer" && prices.link ? (
-                    <a href={prices.link} target="_blank" rel="noopener noreferrer"
-                      className="block text-center text-[11px] text-primary/70 hover:text-primary transition-colors pt-0.5">
-                      Ver no Mercado Pokémon BR →
-                    </a>
-                  ) : (
-                    <p className="text-[10px] text-muted-foreground/50 text-center pt-0.5">
-                      Preço convertido do TCGPlayer · sem listagem nacional
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Sem listagem disponível no mercado nacional.
-                </p>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2 mt-auto pt-1">
+            {/* Ação: adicionar à coleção */}
+            <div className="pt-1">
               {loggedIn ? (
                 <Button
                   className={cn(
@@ -262,17 +303,17 @@ function CardModal({
         </div>
       </div>
 
-      {/* Lightbox */}
+      {/* Lightbox — imagem grande */}
       {imgLarge && (
         <div
-          className="fixed inset-0 z-[60] bg-background/96 flex items-center justify-center p-8 cursor-zoom-out"
+          className="fixed inset-0 z-[60] bg-background/95 flex items-center justify-center p-8 cursor-zoom-out"
           onClick={() => setImgLarge(false)}
         >
-          {card.imageUrl && (
+          {largeImg && (
             <img
-              src={card.imageUrl.replace("/small/", "/large/")}
+              src={largeImg}
               alt={card.name}
-              className="max-h-full max-w-sm rounded-2xl shadow-2xl"
+              className="max-h-[90vh] max-w-[360px] w-full object-contain rounded-2xl shadow-2xl"
               onError={(e) => { (e.target as HTMLImageElement).src = card.imageUrl; }}
             />
           )}

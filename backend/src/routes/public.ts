@@ -10,6 +10,12 @@ const tcgClient = axios.create({
   timeout: 20000,
   headers: TCG_KEY ? { 'X-Api-Key': TCG_KEY } : {},
 });
+// Cliente com timeout maior para sets com muitas cartas (>150)
+const tcgClientSlow = axios.create({
+  baseURL: 'https://api.pokemontcg.io/v2',
+  timeout: 60000,
+  headers: TCG_KEY ? { 'X-Api-Key': TCG_KEY } : {},
+});
 
 // Sets estáticos de fallback (usados quando a API pokemontcg.io está inacessível)
 const FALLBACK_SETS = [
@@ -103,7 +109,8 @@ router.get('/sets', async (_req: Request, res: Response) => {
 // ─── GET /api/public/sets/:setId/cards ───────────────────────────────────────
 
 async function fetchSetCards(setId: string): Promise<any> {
-  const { data } = await tcgClient.get('/cards', {
+  const client = tcgClientSlow; // timeout 60s — sets grandes (me1=188, sv8=264)
+  const { data } = await client.get('/cards', {
     params: {
       q: `set.id:${setId}`,
       orderBy: 'number',
@@ -228,16 +235,28 @@ const TCG_TO_MYP: Record<string, string> = {
 const extractMypNum = (code: string) =>
   (code.split('_').slice(-1)[0] ?? '').split('/')[0].replace(/^0+/, '');
 
-// Gera lista de slugs candidatos para tentar na MYP, do mais específico ao mais genérico
+// Gera lista de slugs candidatos para tentar na MYP, do mais específico ao mais genérico.
+// MYP indexa pelo nome base do Pokémon sem prefixos/sufixos ("venusaur", não "mega venusaur ex").
 function mypSlugs(name: string): string[] {
   const base = name.toLowerCase().replace(/['']/g, '').trim();
-  const slugs: string[] = [base];                          // "charizard ex", "bosss orders"
-  const firstWord = base.split(' ')[0];
-  if (firstWord !== base) slugs.push(firstWord);           // "charizard", "boss"
-  // Sem sufixo ex/gx/v/vmax/vstar — tenta o nome base do Pokémon
+  const slugs: string[] = [];
+
+  // 1. Nome completo sem sufixo ex/gx/vmax/vstar/v (ex: "charizard ex" → "charizard")
   const noSuffix = base.replace(/\s+(ex|gx|vmax|vstar|v)$/i, '').trim();
-  if (noSuffix !== base && noSuffix !== firstWord) slugs.push(noSuffix);
-  return [...new Set(slugs)];
+  slugs.push(noSuffix);
+
+  // 2. Sem prefixo "mega" (ex: "mega venusaur" → "venusaur")
+  const noMega = noSuffix.replace(/^mega\s+/i, '').trim();
+  if (noMega !== noSuffix) slugs.push(noMega);
+
+  // 3. Primeira palavra apenas (ex: "boss" de "boss's orders")
+  const firstWord = base.split(' ')[0];
+  if (!slugs.includes(firstWord)) slugs.push(firstWord);
+
+  // 4. Nome completo original como último recurso
+  if (!slugs.includes(base)) slugs.push(base);
+
+  return [...new Set(slugs)].filter(Boolean);
 }
 
 async function queryMyp(slug: string): Promise<any[]> {
