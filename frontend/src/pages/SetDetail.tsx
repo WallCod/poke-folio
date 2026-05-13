@@ -119,7 +119,8 @@ function CardModal({
   const [pricesLoading, setPricesLoading] = useState(true);
 
   const typeColor = TYPE_COLORS[card.types[0] ?? "Colorless"] ?? TYPE_COLORS.Colorless;
-  const largeImg = card.imageUrl ? card.imageUrl.replace("/small/", "/large/") : "";
+  // TCG API: small = "3.png", large = "3_hires.png"
+  const largeImg = card.imageUrl ? card.imageUrl.replace(/\.png$/, "_hires.png") : "";
 
   useEffect(() => {
     setPricesLoading(true);
