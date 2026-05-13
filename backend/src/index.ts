@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
+import net from 'net';
 
 dotenv.config();
 
@@ -14,6 +15,7 @@ import portfoliosRouter from './routes/portfolios';
 import marketRouter from './routes/market';
 import publicRouter from './routes/public';
 import { scheduleDailyPriceSnapshot } from './jobs/dailyPriceSnapshot';
+import { scheduleMarketSnapshot } from './jobs/marketSnapshot';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -58,11 +60,41 @@ async function bootstrap() {
     process.exit(1);
   }
 
-  app.listen(PORT, () => {
+  // Garante que a porta está livre antes de fazer bind.
+  // ts-node-dev às vezes reinicia o filho antes do OS liberar a porta do processo anterior.
+  function waitForPort(port: number | string, retries = 15, delay = 500): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const attempt = (n: number) => {
+        const probe = net.createServer();
+        probe.once('error', () => {
+          probe.close();
+          if (n <= 0) return reject(new Error(`Porta ${port} não liberou após tentativas`));
+          setTimeout(() => attempt(n - 1), delay);
+        });
+        probe.once('listening', () => {
+          probe.close(() => resolve());
+        });
+        probe.listen(port);
+      };
+      attempt(retries);
+    });
+  }
+
+  await waitForPort(PORT);
+
+  const server = app.listen(PORT, () => {
     console.log(`[Server] Backend rodando em http://localhost:${PORT}`);
   });
 
+  const shutdown = () => {
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 3000).unref();
+  };
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT',  shutdown);
+
   scheduleDailyPriceSnapshot();
+  scheduleMarketSnapshot();
 }
 
 bootstrap();

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, Plus, Loader2, Lock, Star, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EnergyIcon } from "@/components/EnergyIcon";
@@ -8,6 +8,7 @@ import api from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { modal } from "@/store/useAppModal";
 import { usePortfolios } from "@/store/usePortfolios";
+import { useAuthModal } from "@/store/useAuthModal";
 import { PublicFooter } from "@/components/PublicFooter";
 import { PublicHeader } from "@/components/PublicHeader";
 
@@ -93,7 +94,8 @@ function CardModal({
   useEffect(() => {
     setPricesLoading(true);
     const baseUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3001/api").replace(/\/api$/, "");
-    fetch(`${baseUrl}/api/public/card-price/${encodeURIComponent(card.tcgId)}`)
+    const params = new URLSearchParams({ name: card.name, number: card.number });
+    fetch(`${baseUrl}/api/public/card-price/${encodeURIComponent(card.tcgId)}?${params}`)
       .then((r) => r.json())
       .then((d) => setPrices(d?.floor !== undefined ? d : null))
       .catch(() => setPrices(null))
@@ -399,6 +401,7 @@ const SetDetail = () => {
   const [selectedCard, setSelectedCard] = useState<SetCard | null>(null);
 
   const { portfolios, fetchPortfolios, addItem } = usePortfolios();
+  const { open: openAuth } = useAuthModal();
 
   const baseUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3001/api").replace(/\/api$/, "");
 
@@ -456,7 +459,7 @@ const SetDetail = () => {
     }
   }, [session, defaultPortfolio, addItem, setId]);
 
-  const handleLoginRequired = () => navigate("/", { state: { openModal: "signup" } });
+  const handleLoginRequired = () => openAuth("signup");
 
   const handleBack = () => {
     if (window.history.length > 2) navigate(-1);
@@ -612,13 +615,12 @@ const SetDetail = () => {
             <p className="text-sm text-muted-foreground mb-3">
               Crie uma conta para marcar as cartas e acompanhar seu progresso.
             </p>
-            <Link
-              to="/"
-              state={{ openModal: "signup" }}
+            <button
+              onClick={() => openAuth("signup")}
               className="inline-flex items-center gap-2 bg-gradient-gold text-background font-semibold text-sm px-5 py-2 rounded-lg hover:opacity-90 transition-opacity"
             >
               Criar conta grátis
-            </Link>
+            </button>
           </div>
         )}
       </div>

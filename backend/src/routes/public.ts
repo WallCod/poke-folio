@@ -41,7 +41,7 @@ let topCardsCache: { data: any[]; at: number } | null = null;
 const setCardsCache: Record<string, { data: any; at: number }> = {};
 
 const SETS_TTL      = 6  * 60 * 60 * 1000;   // 6h
-const TREND_TTL     = 60 * 60 * 1000;         // 1h
+const TREND_TTL     = 5  * 60 * 1000;         // 5min (marketSnapshot roda a cada 30min)
 const TOP_TTL       = 30 * 60 * 1000;         // 30min
 const SET_CARDS_TTL = 12 * 60 * 60 * 1000;   // 12h
 
@@ -71,6 +71,13 @@ async function getUsdBrlRate(): Promise<number> {
     return brlRateCache?.rate ?? 5.7;
   }
 }
+
+// ─── GET /api/public/cache-purge (dev/ops) ───────────────────────────────────
+router.get('/cache-purge', (_req: Request, res: Response) => {
+  trendingCache = null;
+  topCardsCache = null;
+  res.json({ ok: true, msg: 'trending + top cache cleared' });
+});
 
 // ─── GET /api/public/sets ─────────────────────────────────────────────────────
 
@@ -158,67 +165,178 @@ router.get('/sets/:setId/cards', async (req: Request, res: Response) => {
 });
 
 // ─── GET /api/public/card-price/:tcgId ───────────────────────────────────────
-// Retorna preços MYP (floor/avg/max) para uma carta específica.
-// Primeiro tenta o BD; se não tiver preço salvo, chama MYP ao vivo.
+// Busca preços diretamente da MYP usando name+number passados como query params.
+// Não depende do BD — preços vêm sempre de fora.
 
 const cardPriceCache: Record<string, { data: any; at: number }> = {};
 const CARD_PRICE_TTL = 15 * 60 * 1000; // 15min
 
+// Mapa setId TCG → edition_code MYP (verificado empiricamente)
+const TCG_TO_MYP: Record<string, string> = {
+  // Scarlet & Violet (EN)
+  'sv8pt5': 'PRE', 'sv8': 'SSP',  'sv7': 'SCR',   'sv6pt5': 'SFA',
+  'sv6':    'TWM', 'sv5': 'TEF',  'sv4pt5': 'PAF', 'sv4': 'PAR',
+  'sv3pt5': 'MEW', 'sv3': 'OBF',  'sv2': 'SV2',   'sv1': 'SV1',
+  // Sword & Shield
+  'swsh12':   'SIT', 'swsh11': 'LOR', 'swsh10pt5': 'PGO', 'swsh10': 'ASR',
+  'swsh9':    'BRS', 'swsh8':  'FST', 'swsh7':     'EVS', 'swsh6':  'CRE',
+  'swsh5':    'BST', 'swsh4pt5': 'SHF', 'swsh4':   'VIV', 'swsh35': 'CEL',
+  'swsh3':    'DAA', 'swsh2':  'RCL', 'swsh1':     'SSH',
+  // Sun & Moon
+  'sm12': 'CEC', 'sm11': 'UNM', 'sm10': 'UNB', 'sm9':  'TEU',
+  'sm8':  'HIF', 'sm7':  'CLS', 'sm75': 'DRM', 'sm6':  'FLI',
+  'sm5':  'UPR', 'sm4':  'CIN', 'sm35': 'SLG', 'sm3':  'BUS',
+  'sm2':  'GRI', 'sm1':  'SUM',
+  // XY
+  'xy12': 'EVO', 'xy11': 'STS', 'xy10': 'FCO', 'xy9':  'BKP',
+  'xy8':  'BKT', 'xy7':  'AOR', 'xy6':  'ROS', 'xy5':  'PRC',
+  'xy4':  'PHF', 'xy3':  'FFI', 'xy2':  'FLF', 'xy1':  'XY',
+  // Black & White
+  'bw11': 'LTR', 'bw10': 'PLB', 'bw9':  'PLF', 'bw8':  'BCR',
+  'bw7':  'LT',  'bw6':  'DRX', 'bw5':  'DEX', 'bw4':  'NXD',
+  'bw3':  'NVI', 'bw2':  'EPO', 'bw1':  'BLW',
+  // HeartGold SoulSilver
+  'hgss4': 'TRM', 'hgss3': 'UL', 'hgss2': 'UD', 'hgss1': 'HS',
+  // Platinum
+  'pl4': 'AR', 'pl3': 'SH', 'pl2': 'RR', 'pl1': 'PL',
+  // Diamond & Pearl
+  'dp6': 'MT', 'dp5': 'SW', 'dp4': 'GE', 'dp3': 'MD', 'dp1': 'DP',
+  // Base sets
+  'base1': 'BS', 'base2': 'B2', 'base3': 'JU', 'base4': 'FO',
+  'base5': 'TK', 'base6': 'LC', 'gym1': 'G1', 'gym2': 'G2',
+  'neo1': 'N1', 'neo2': 'N2', 'neo3': 'N3', 'neo4': 'N4',
+};
+
+const extractMypNum = (code: string) =>
+  (code.split('_').slice(-1)[0] ?? '').split('/')[0].replace(/^0+/, '');
+
+// Gera lista de slugs candidatos para tentar na MYP, do mais específico ao mais genérico
+function mypSlugs(name: string): string[] {
+  const base = name.toLowerCase().replace(/['']/g, '').trim();
+  const slugs: string[] = [base];                          // "charizard ex", "bosss orders"
+  const firstWord = base.split(' ')[0];
+  if (firstWord !== base) slugs.push(firstWord);           // "charizard", "boss"
+  // Sem sufixo ex/gx/v/vmax/vstar — tenta o nome base do Pokémon
+  const noSuffix = base.replace(/\s+(ex|gx|vmax|vstar|v)$/i, '').trim();
+  if (noSuffix !== base && noSuffix !== firstWord) slugs.push(noSuffix);
+  return [...new Set(slugs)];
+}
+
+async function queryMyp(slug: string): Promise<any[]> {
+  try {
+    const { data } = await axios.get(
+      `https://mypcards.com/api/v1/pokemon/carta/${encodeURIComponent(slug)}`,
+      { timeout: 8000 }
+    );
+    return (data.cards as any[]) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// Sets EN modernos em ordem de preferência (mais recente primeiro)
+const EN_EDITIONS_ORDERED = [
+  'PRE','SSP','SCR','SFA','TWM','TEF','PAF','PAR','MEW','OBF','SV2','SV1',
+  'SIT','LOR','PGO','ASR','BRS','FST','EVS','CRE','BST','SHF','VIV','CEL','DAA','RCL','SSH',
+  'CEC','UNM','UNB','TEU','HIF','CLS','DRM','FLI','UPR','CIN','SLG','BUS','GRI','SUM',
+  'EVO','STS','FCO','BKP','BKT','AOR','ROS','PRC','PHF','FFI','FLF','XY',
+  'LTR','PLB','PLF','BCR','DRX','DEX','NXD','NVI','EPO','BLW',
+  'BS','B2','JU','FO','LC','N1','N2','N3','N4','AR','RR','HS','UD',
+];
+const EN_EDITIONS_SET = new Set(EN_EDITIONS_ORDERED);
+
+function pickBestCard(cards: any[], mypEdition: string | undefined, numClean: string): any | null {
+  // 1. Edição exata + número exato
+  if (mypEdition) {
+    const m = cards.find((c) =>
+      c.edition_code?.toUpperCase() === mypEdition.toUpperCase() &&
+      extractMypNum(c.card_code) === numClean
+    );
+    if (m) return m;
+  }
+
+  // 2. Qualquer edição EN com mesmo número e preço
+  const byNum = cards.filter((c) =>
+    extractMypNum(c.card_code) === numClean &&
+    c.min_price != null &&
+    EN_EDITIONS_SET.has(c.edition_code?.toUpperCase())
+  );
+  if (byNum.length > 0) return byNum[0];
+
+  // 3. Qualquer edição (incluindo JP) com mesmo número e preço
+  const byNumAny = cards.filter((c) =>
+    extractMypNum(c.card_code) === numClean && c.min_price != null
+  );
+  if (byNumAny.length > 0) return byNumAny[0];
+
+  // 4. Para trainers sem número correspondente: EN mais recente com preço
+  const anyEn = cards
+    .filter((c) => c.min_price != null && EN_EDITIONS_SET.has(c.edition_code?.toUpperCase()))
+    .sort((a, b) => {
+      const ai = EN_EDITIONS_ORDERED.indexOf(a.edition_code?.toUpperCase());
+      const bi = EN_EDITIONS_ORDERED.indexOf(b.edition_code?.toUpperCase());
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+  if (anyEn.length > 0) return anyEn[0];
+
+  // 5. Último recurso: qualquer card com preço (inclui JP/promo) — melhor que null
+  const anyWithPrice = cards.filter((c) => c.min_price != null);
+  if (anyWithPrice.length > 0) return anyWithPrice[0];
+
+  return null;
+}
+
+async function fetchMypPrice(name: string, number: string, tcgId?: string): Promise<{ floor: number | null; avg: number | null; max: number | null; link: string | null; qty: number | null }> {
+  const setId   = tcgId?.split('-')[0]?.toLowerCase();
+  const mypEd   = setId ? TCG_TO_MYP[setId] : undefined;
+  const numClean = number.replace(/[^0-9]/g, '').replace(/^0+/, '') || number.toLowerCase();
+
+  let match: any = null;
+
+  for (const slug of mypSlugs(name)) {
+    const cards = await queryMyp(slug);
+    if (cards.length === 0) continue;
+    match = pickBestCard(cards, mypEd, numClean);
+    if (match) break;
+  }
+
+  if (!match) return { floor: null, avg: null, max: null, link: null, qty: null };
+
+  return {
+    floor: match.min_price != null ? parseFloat(match.min_price) : null,
+    avg:   match.avg_price != null ? parseFloat(match.avg_price) : null,
+    max:   match.max_price != null ? parseFloat(match.max_price) : null,
+    link:  match.link ?? null,
+    qty:   match.available_quantity ?? null,
+  };
+}
+
 router.get('/card-price/:tcgId', async (req: Request, res: Response) => {
   const { tcgId } = req.params;
-  const cacheKey = tcgId;
+  const { name, number } = req.query as { name?: string; number?: string };
 
+  // Cache key inclui name+number para evitar servir resultado vazio (sem params) para requisições com params
+  const cacheKey = name && number ? `${tcgId}|${name}|${number}` : tcgId;
   if (cardPriceCache[cacheKey] && Date.now() - cardPriceCache[cacheKey].at < CARD_PRICE_TTL) {
     res.json(cardPriceCache[cacheKey].data);
     return;
   }
 
   try {
-    const card = await Card.findOne({ tcgId })
-      .select('name number setCode marketPriceBrl marketPriceBrlMin marketPriceBrlMax priceSource');
-
-    if (card && card.marketPriceBrl != null && card.priceSource === 'mypcards') {
-      const result = {
-        floor: card.marketPriceBrlMin ?? card.marketPriceBrl,
-        avg:   card.marketPriceBrl,
-        max:   card.marketPriceBrlMax,
-      };
+    if (name && number) {
+      const result = await fetchMypPrice(name, number, tcgId);
       cardPriceCache[cacheKey] = { data: result, at: Date.now() };
       res.json(result);
       return;
     }
 
-    // Se não tem no BD ou não é mypcards, tenta MYP ao vivo
+    // Fallback: tenta pegar name+number do BD
+    const card = await Card.findOne({ tcgId }).select('name number');
     if (card?.name && card?.number) {
-      const axios2 = (await import('axios')).default;
-      const cleaned = card.name
-        .replace(/^(mega|dark|light|shadow|m\s+)\s+/i, '')
-        .replace(/\s+(ex|gx|v|vmax|vstar|prime)\s*$/i, '')
-        .trim();
-      const slug = cleaned.toLowerCase().split(' ')[0];
-
-      const { data: mypData } = await axios2.get(
-        `https://mypcards.com/api/v1/pokemon/carta/${encodeURIComponent(slug)}`,
-        { timeout: 6000 }
-      );
-      const cards = (mypData.cards as any[]) ?? [];
-      const num = card.number.replace(/[^0-9]/g, '');
-      const match = cards.find((c: any) => {
-        const parts = c.card_code.split('_');
-        const numPart = (parts[parts.length - 1]?.split('/')[0] ?? '').replace(/^0+/, '');
-        return numPart === num.replace(/^0+/, '');
-      }) ?? null;
-
-      if (match) {
-        const result = {
-          floor: match.min_price ? parseFloat(match.min_price) : null,
-          avg:   match.avg_price ? parseFloat(match.avg_price) : null,
-          max:   match.max_price ? parseFloat(match.max_price) : null,
-        };
-        cardPriceCache[cacheKey] = { data: result, at: Date.now() };
-        res.json(result);
-        return;
-      }
+      const result = await fetchMypPrice(card.name, card.number, tcgId);
+      cardPriceCache[cacheKey] = { data: result, at: Date.now() };
+      res.json(result);
+      return;
     }
 
     res.json({ floor: null, avg: null, max: null });
@@ -228,7 +346,66 @@ router.get('/card-price/:tcgId', async (req: Request, res: Response) => {
   }
 });
 
+// ─── Helpers para top/trending — dados externos, zero MongoDB ────────────────
+
+function tcgCardToItem(raw: any, rate: number): any | null {
+  const p = raw?.tcgplayer?.prices;
+  if (!p) return null;
+
+  // Pega o tier de preço disponível (holofoil tem priority)
+  const tier =
+    p.holofoil ??
+    p['1stEditionHolofoil'] ??
+    p.ultraHolofoil ??
+    p.reverseHolofoil ??
+    p.normal ??
+    null;
+  if (!tier) return null;
+
+  const market = tier.market    as number | null;
+  const mid    = tier.mid       as number | null;
+  const low    = tier.low       as number | null;
+  const high   = tier.high      as number | null;
+
+  if (!market || market < 0.5) return null;
+
+  // changePct: usa market vs mid como sinal de pressão de compra/venda.
+  // Se mid não disponível, usa low como referência.
+  // Para gainers: market > mid (compra acima do mediano)
+  // Para losers: market < mid (venda abaixo do mediano)
+  let changePct: number | null = null;
+  if (mid != null && mid > 0) {
+    changePct = Math.round(((market - mid) / mid) * 1000) / 10;
+  } else if (low != null && low > 0) {
+    changePct = Math.round(((market - low) / low) * 1000) / 10;
+  }
+
+  const brl = (v: number | null) => v != null ? Math.round(v * rate * 100) / 100 : null;
+
+  return {
+    tcgId:        raw.id,
+    name:         raw.name,
+    setName:      raw.set?.name ?? '',
+    number:       raw.number,
+    rarity:       raw.rarity ?? '',
+    imageUrl:     raw.images?.small ?? '',
+    imageUrlLarge: raw.images?.large ?? raw.images?.small ?? '',
+    priceBrl:     brl(market),
+    priceUsd:     market,
+    midUsd:       mid,
+    lowUsd:       low,
+    highUsd:      high,
+    midBrl:       brl(mid),
+    lowBrl:       brl(low),
+    highBrl:      brl(high),
+    changePct,
+    types:        raw.types ?? [],
+    tcgUrl:       raw.tcgplayer?.url ?? null,
+  };
+}
+
 // ─── GET /api/public/top ─────────────────────────────────────────────────────
+// Cartas mais valiosas do mercado global — direto da TCG API, sem BD
 
 router.get('/top', async (_req: Request, res: Response) => {
   try {
@@ -237,35 +414,35 @@ router.get('/top', async (_req: Request, res: Response) => {
       return;
     }
 
-    const cards = await Card.find({ marketPriceBrl: { $gt: 0 } })
-      .sort({ marketPriceBrl: -1 })
-      .limit(10)
-      .select('tcgId name setName setCode number rarity imageUrl marketPriceBrl marketPriceUsd types priceChangePct');
+    const rate = await getUsdBrlRate();
 
-    const result = cards.map((c) => ({
-      tcgId:     c.tcgId,
-      name:      c.name,
-      setName:   c.setName,
-      number:    c.number,
-      rarity:    c.rarity,
-      imageUrl:  c.imageUrl,
-      priceBrl:  c.marketPriceBrl,
-      priceUsd:  c.marketPriceUsd,
-      changePct: (c as any).priceChangePct ?? null,
-      types:     (c as any).types ?? [],
-    }));
+    // Busca as cartas com maior preço de mercado TCGPlayer
+    const { data } = await tcgClient.get('/cards', {
+      params: {
+        q: 'tcgplayer.prices.holofoil.market:[20 TO *]',
+        orderBy: '-tcgplayer.prices.holofoil.market',
+        pageSize: 30,
+        select: 'id,name,set,number,rarity,types,images,tcgplayer',
+      },
+    });
+
+    const result = (data.data as any[])
+      .map((c) => tcgCardToItem(c, rate))
+      .filter(Boolean)
+      .slice(0, 10);
 
     topCardsCache = { data: result, at: Date.now() };
     res.json(result);
-  } catch (err) {
-    console.error('[public/top] erro:', err);
-    res.status(500).json({ error: 'Erro interno.' });
+  } catch (err: any) {
+    console.error('[public/top] erro:', err?.message ?? err);
+    res.json([]);
   }
 });
 
 // ─── GET /api/public/trending ─────────────────────────────────────────────────
-// Busca gainers/losers reais via pokemontcg.io (priceChange USD)
-// + popular do nosso BD ou da API TCG
+// gainers  → cartas com market muito acima do mid (pressão de compra real)
+// losers   → cartas com market abaixo do mid (pressão de venda)
+// popular  → top por valor absoluto de mercado
 
 router.get('/trending', async (req: Request, res: Response) => {
   const period = (req.query.period as string) ?? 'week';
@@ -276,174 +453,124 @@ router.get('/trending', async (req: Request, res: Response) => {
       return;
     }
 
-    // ── 1. Tenta gainers/losers via PriceHistory (nosso BD) ──────────────────
-    const periodMs: Record<string, number> = {
-      day:   24 * 60 * 60 * 1000,
-      week:  7  * 24 * 60 * 60 * 1000,
-      month: 30 * 24 * 60 * 60 * 1000,
-    };
-    const ms    = periodMs[period] ?? periodMs.week;
-    const since = new Date(Date.now() - ms);
+    const rate = await getUsdBrlRate();
 
-    const history = await PriceHistory.aggregate([
-      { $match: { recordedAt: { $gte: since }, priceBrl: { $gt: 0 } } },
-      { $sort: { tcgId: 1, recordedAt: 1 } },
-      {
-        $group: {
-          _id:        '$tcgId',
-          firstPrice: { $first: '$priceBrl' },
-          lastPrice:  { $last:  '$priceBrl' },
-          count:      { $sum: 1 },
+    const [highRes, midRes, popularRes] = await Promise.allSettled([
+      // Gainers: cartas de alto valor — pageSize maior para ter candidatos suficientes após filtro changePct > 0
+      tcgClient.get('/cards', {
+        params: {
+          q: 'tcgplayer.prices.holofoil.market:[50 TO *]',
+          orderBy: '-tcgplayer.prices.holofoil.market',
+          pageSize: 100,
+          select: 'id,name,set,number,rarity,types,images,tcgplayer',
         },
-      },
-      {
-        $project: {
-          tcgId:      '$_id',
-          firstPrice: 1,
-          lastPrice:  1,
-          count:      1,
-          changePct: {
-            $multiply: [
-              { $divide: [{ $subtract: ['$lastPrice', '$firstPrice'] }, '$firstPrice'] },
-              100,
-            ],
-          },
+      }),
+      // Losers: faixa intermediária com seed do dia para variedade
+      tcgClient.get('/cards', {
+        params: {
+          q: 'tcgplayer.prices.holofoil.market:[20 TO 80]',
+          orderBy: '-tcgplayer.prices.holofoil.market',
+          pageSize: 250,
+          select: 'id,name,set,number,rarity,types,images,tcgplayer',
         },
-      },
-      { $match: { count: { $gte: 2 }, changePct: { $ne: 0 } } },
+      }),
+      // Popular: top geral por valor
+      tcgClient.get('/cards', {
+        params: {
+          q: 'tcgplayer.prices.holofoil.market:[10 TO *]',
+          orderBy: '-tcgplayer.prices.holofoil.market',
+          pageSize: 30,
+          select: 'id,name,set,number,rarity,types,images,tcgplayer',
+        },
+      }),
     ]);
 
-    let gainers: any[] = [];
-    let losers:  any[] = [];
+    // Listagem única: low===mid===high — changePct distorcido, não usar como sinal de tendência
+    const isSparse = (c: any) =>
+      c.lowUsd != null && c.midUsd != null && c.highUsd != null &&
+      c.lowUsd === c.midUsd && c.midUsd === c.highUsd;
 
-    if (history.length >= 4) {
-      const sorted  = history.sort((a, b) => b.changePct - a.changePct);
-      const gainerH = sorted.filter((h) => h.changePct > 0).slice(0, 10);
-      const loserH  = sorted.filter((h) => h.changePct < 0).slice(-10).reverse();
-      const allIds  = [...new Set([...gainerH, ...loserH].map((h) => h.tcgId))];
-      const dbCards = await Card.find({ tcgId: { $in: allIds } })
-        .select('tcgId name setName number rarity imageUrl marketPriceBrl types');
-      const cardMap = new Map(dbCards.map((c) => [c.tcgId, c]));
+    // Para gainers: usa (market - low) / low — market acima do mínimo recente = pressão de compra.
+    // Mínimo de +5% para filtrar ruído.
+    const gainers = highRes.status === 'fulfilled'
+      ? (highRes.value.data.data as any[])
+          .map((c) => tcgCardToItem(c, rate))
+          .filter(Boolean)
+          .filter((c: any) => !isSparse(c))
+          .map((c: any) => {
+            const { priceUsd: market, lowUsd: low } = c;
+            // low < market/3 → outlier de listagem barata, não usar como sinal de alta
+            if (low != null && low > 0 && market != null && low >= market / 3) {
+              const pct = Math.round(((market - low) / low) * 1000) / 10;
+              return { ...c, changePct: pct };
+            }
+            return { ...c, changePct: null };
+          })
+          .filter((c: any) => c.changePct !== null && c.changePct > 5)
+          .sort((a: any, b: any) => (b.changePct ?? 0) - (a.changePct ?? 0))
+          .slice(0, 10)
+      : [];
 
-      const enrich = (list: any[]) =>
-        list.map((h) => {
-          const card = cardMap.get(h.tcgId);
-          if (!card) return null;
-          return {
-            tcgId:    card.tcgId, name: card.name, setName: card.setName,
-            number:   card.number, rarity: card.rarity, imageUrl: card.imageUrl,
-            priceBrl: h.lastPrice,
-            changePct: Math.round(h.changePct * 10) / 10,
-            types:    (card as any).types ?? [],
-          };
-        }).filter(Boolean);
+    const daySeed = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
+    let losers: any[] = [];
+    if (midRes.status === 'fulfilled') {
+      const raw = midRes.value.data.data as any[];
 
-      gainers = enrich(gainerH);
-      losers  = enrich(loserH);
+      // Para losers: usa (market - high) / high como sinal.
+      // Cartas onde o market está abaixo do high = caíram de um pico recente.
+      // Mínimo de spread de -5% para filtrar ruído.
+      const candidates = raw
+        .map((c) => tcgCardToItem(c, rate))
+        .filter(Boolean)
+        .filter((c: any) => !isSparse(c))
+        .map((c: any) => {
+          const { priceUsd: market, highUsd: high } = c;
+          // high > 3x market → provável outlier de listagem, não usar como sinal de queda
+          if (high != null && high > 0 && market != null && high <= market * 3) {
+            const pct = Math.round(((market - high) / high) * 1000) / 10;
+            return { ...c, changePct: pct };
+          }
+          return { ...c, changePct: null };
+        })
+        .filter((c: any) => c.changePct !== null && c.changePct < -5);
+
+
+      losers = candidates
+        .map((c: any, i: number) => ({ c, sort: (i * 2654435761 + daySeed) >>> 0 }))
+        .sort((a: any, b: any) => a.sort - b.sort)
+        .map(({ c }: any) => c)
+        .slice(0, 10);
     } else {
-      // ── 2. Fallback: busca na pokemontcg.io cartas com priceChangeAmount > 0 ─
-      try {
-        const rate = await getUsdBrlRate();
-
-        // Busca cartas com maior variação positiva (gainers)
-        const [gainRes, loseRes] = await Promise.allSettled([
-          tcgClient.get('/cards', {
-            params: {
-              q: 'tcgplayer.prices.holofoil.market:[10 TO *]',
-              orderBy: '-tcgplayer.prices.holofoil.market',
-              pageSize: 20,
-              select: 'id,name,set,number,rarity,types,images,tcgplayer',
-            },
-          }),
-          tcgClient.get('/cards', {
-            params: {
-              q: 'tcgplayer.prices.normal.market:[1 TO 50]',
-              orderBy: 'tcgplayer.prices.normal.market',
-              pageSize: 20,
-              select: 'id,name,set,number,rarity,types,images,tcgplayer',
-            },
-          }),
-        ]);
-
-        const toItem = (raw: any, changePct: number | null) => {
-          const usd = extractUsdPrice(raw);
-          if (!usd || usd < 0.5) return null;
-          return {
-            tcgId:    raw.id,
-            name:     raw.name,
-            setName:  raw.set?.name ?? '',
-            number:   raw.number,
-            rarity:   raw.rarity ?? '',
-            imageUrl: raw.images?.small ?? '',
-            priceBrl: Math.round(usd * rate * 100) / 100,
-            changePct,
-            types:    raw.types ?? [],
-          };
-        };
-
-        if (gainRes.status === 'fulfilled') {
-          const cards = (gainRes.value.data.data as any[]);
-          gainers = cards
-            .map((c, i) => toItem(c, Math.round((20 - i * 2 + Math.random() * 5) * 10) / 10))
-            .filter(Boolean)
-            .slice(0, 10);
-        }
-
-        if (loseRes.status === 'fulfilled') {
-          const cards = (loseRes.value.data.data as any[]);
-          losers = cards
-            .map((c, i) => toItem(c, -Math.round((5 + i * 2 + Math.random() * 5) * 10) / 10))
-            .filter(Boolean)
-            .slice(0, 10);
-        }
-      } catch (tcgErr: any) {
-        const tcgMsg = tcgErr?.code ?? tcgErr?.message ?? 'erro';
-        console.warn(`[trending] fallback TCG API indisponível (${tcgMsg}), usando BD.`);
-        // Se tudo falhou, usa priceChangePct do BD
-        const [gCards, lCards] = await Promise.all([
-          Card.find({ priceChangePct: { $gt: 0 }, marketPriceBrl: { $gt: 0 } })
-            .sort({ priceChangePct: -1 }).limit(10)
-            .select('tcgId name setName number rarity imageUrl marketPriceBrl types priceChangePct'),
-          Card.find({ priceChangePct: { $lt: 0 }, marketPriceBrl: { $gt: 0 } })
-            .sort({ priceChangePct: 1 }).limit(10)
-            .select('tcgId name setName number rarity imageUrl marketPriceBrl types priceChangePct'),
-        ]);
-        const toDbItem = (c: any) => ({
-          tcgId: c.tcgId, name: c.name, setName: c.setName,
-          number: c.number, rarity: c.rarity, imageUrl: c.imageUrl,
-          priceBrl: c.marketPriceBrl,
-          changePct: c.priceChangePct ? Math.round(c.priceChangePct * 10) / 10 : null,
-          types: c.types ?? [],
-        });
-        gainers = gCards.map(toDbItem);
-        losers  = lCards.map(toDbItem);
-      }
+      console.error('[trending/losers] midRes rejected:', (midRes as any).reason?.message ?? midRes);
     }
 
-    // ── 3. Popular = mais valiosas do nosso BD ────────────────────────────────
-    const popularCards = await Card.find({ marketPriceBrl: { $gt: 0 } })
-      .sort({ marketPriceBrl: -1 })
-      .limit(10)
-      .select('tcgId name setName number rarity imageUrl marketPriceBrl types priceChangePct');
-
-    const popular = popularCards.map((c) => ({
-      tcgId:    c.tcgId,
-      name:     c.name,
-      setName:  c.setName,
-      number:   c.number,
-      rarity:   c.rarity,
-      imageUrl: c.imageUrl,
-      priceBrl: c.marketPriceBrl,
-      changePct: (c as any).priceChangePct ? Math.round((c as any).priceChangePct * 10) / 10 : null,
-      types:    (c as any).types ?? [],
-    }));
+    const popular = popularRes.status === 'fulfilled'
+      ? (popularRes.value.data.data as any[])
+          .map((c) => tcgCardToItem(c, rate))
+          .filter(Boolean)
+          .map((c: any) => {
+            if (isSparse(c)) return { ...c, changePct: null };
+            // Se changePct já calculado (market vs mid) — mantém
+            if (c.changePct !== null) return c;
+            // Fallback: usa market vs low quando mid não disponível
+            const { priceUsd: market, lowUsd: low } = c;
+            if (low != null && low > 0 && market != null && low <= market * 5) {
+              return { ...c, changePct: Math.round(((market - low) / low) * 1000) / 10 };
+            }
+            return c;
+          })
+          .slice(0, 10)
+      : [];
 
     const result = { gainers, losers, popular, period };
-    trendingCache = { data: result, at: Date.now(), period };
+    // Só cacheia se todas as três listas tiverem dados
+    if (gainers.length > 0 && losers.length > 0 && popular.length > 0) {
+      trendingCache = { data: result, at: Date.now(), period };
+    }
     res.json(result);
-  } catch (err) {
-    console.error('[public/trending] erro:', err);
-    res.status(500).json({ error: 'Erro interno.' });
+  } catch (err: any) {
+    console.error('[public/trending] erro:', err?.message ?? err);
+    res.json({ gainers: [], losers: [], popular: [], period });
   }
 });
 

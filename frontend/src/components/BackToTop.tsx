@@ -21,7 +21,7 @@ export const BackToTop = () => {
       aria-label="Voltar ao topo"
       onClick={scrollTop}
       className={cn(
-        "fixed bottom-24 right-8 md:bottom-8 md:right-8 z-50",
+        "fixed bottom-24 right-6 md:bottom-20 md:right-8 z-50",
         "h-12 w-12 rounded-full flex items-center justify-center",
         "bg-card/90 backdrop-blur border border-primary/40 text-primary",
         "shadow-glow-gold hover:bg-primary hover:text-background",

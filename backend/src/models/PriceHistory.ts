@@ -13,7 +13,7 @@ const PriceHistorySchema = new Schema<IPriceHistory>({
   priceBrl:   { type: Number, required: true },
   priceUsd:   { type: Number, default: null },
   source:     { type: String, default: 'mypcards' },
-  recordedAt: { type: Date,   default: () => new Date(), index: true },
+  recordedAt: { type: Date, default: () => new Date() },
 });
 
 // TTL: mantém até 2 anos de histórico
